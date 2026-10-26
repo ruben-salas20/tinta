@@ -1,0 +1,9 @@
+build/
+.gradle/
+local.properties
+.kotlin/
+*.iml
+.idea/
+# La clave de firma nunca entra en el repo.
+*.jks
+*.keystore

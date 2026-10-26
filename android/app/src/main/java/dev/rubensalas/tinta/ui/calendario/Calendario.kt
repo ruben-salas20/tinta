@@ -1,0 +1,406 @@
+package dev.rubensalas.tinta.ui.calendario
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import dev.rubensalas.tinta.data.Datos
+import dev.rubensalas.tinta.data.calendario.longitud
+import dev.rubensalas.tinta.data.calendario.partir
+import dev.rubensalas.tinta.data.local.CanalE
+import dev.rubensalas.tinta.data.local.Parte
+import dev.rubensalas.tinta.data.local.PublicacionE
+import dev.rubensalas.tinta.ui.comun.BotonCrear
+import dev.rubensalas.tinta.ui.comun.Cabecera
+import dev.rubensalas.tinta.ui.comun.Chip
+import dev.rubensalas.tinta.ui.comun.FilaPublicacion
+import dev.rubensalas.tinta.ui.comun.Grupo
+import dev.rubensalas.tinta.ui.comun.IconoRed
+import dev.rubensalas.tinta.ui.comun.Tarjeta
+import dev.rubensalas.tinta.ui.comun.diaCorto
+import dev.rubensalas.tinta.ui.comun.fecha
+import dev.rubensalas.tinta.ui.comun.fechaCorta
+import dev.rubensalas.tinta.ui.comun.mezcla
+import dev.rubensalas.tinta.ui.editor.BotonPildora
+import dev.rubensalas.tinta.ui.tema.Estilos
+import dev.rubensalas.tinta.ui.tema.Mono
+import dev.rubensalas.tinta.ui.tema.NOMBRE_ESTADO
+import dev.rubensalas.tinta.ui.tema.Tinta
+import dev.rubensalas.tinta.ui.tema.estado
+import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+
+/** La agenda: lo atrasado arriba y después cada día con algo, de hoy en adelante. */
+@Composable
+fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit, onNueva: () -> Unit) {
+    val c = Tinta.colores
+    val d = hoy.toString()
+    val atrasadas = datos.publicaciones.filter { it.fecha < d && it.estado != "publicada" }.sortedWith(Datos.ORDEN)
+    val dias = datos.publicaciones.filter { it.fecha >= d }.sortedWith(Datos.ORDEN).groupBy { it.fecha }
+    val recientes = datos.publicaciones.filter { it.fecha < d && it.fecha >= hoy.minusDays(14).toString() && it.estado == "publicada" }
+        .sortedWith(Datos.ORDEN).reversed()
+    Box(Modifier.fillMaxSize().background(c.papel)) {
+        Column(Modifier.fillMaxSize()) {
+            Cabecera("Calendario")
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 96.dp)) {
+                if (atrasadas.isNotEmpty()) {
+                    Grupo("Atrasadas")
+                    Tarjeta { Dia(null, atrasadas, datos, onPublicacion, conFecha = true) }
+                }
+                Grupo("Próximas")
+                if (dias.isEmpty()) Text("Nada planeado. Pulsa + para añadir una publicación.", style = Estilos.ui, color = c.secundario)
+                else Tarjeta {
+                    dias.entries.forEachIndexed { i, (f, ps) ->
+                        if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = c.linea)
+                        Dia(fecha(f), ps, datos, onPublicacion)
+                    }
+                }
+                if (recientes.isNotEmpty()) {
+                    Grupo("Publicadas hace poco")
+                    Tarjeta { Dia(null, recientes, datos, onPublicacion, conFecha = true) }
+                }
+            }
+        }
+        BotonCrear(Modifier.align(Alignment.BottomEnd).padding(18.dp), onClick = onNueva)
+    }
+}
+
+@Composable
+private fun Dia(d: LocalDate?, ps: List<PublicacionE>, datos: Datos, onPublicacion: (String) -> Unit, conFecha: Boolean = false) {
+    val c = Tinta.colores
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (d != null) Column(Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${d.dayOfMonth}", style = Estilos.ui.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold), color = c.texto)
+            Text(diaCorto(d).uppercase(), style = Estilos.uiPeque.copy(fontSize = 11.sp), color = c.tenue)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (p in ps) {
+                val extra = if (conFecha) fecha(p.fecha)?.let(::fechaCorta) else p.hora
+                FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, extra) { onPublicacion(p.id) }
+            }
+        }
+    }
+}
+
+/** Lo que el detalle de una publicación pide a la app. */
+interface AccionesPublicacion {
+    fun cambiar(campos: Map<String, String?>)
+    fun partes(partes: List<Parte>)
+    fun publicada(enlace: String)
+    fun borrar()
+    fun copiar(texto: String)
+    fun elegirImagen(onElegida: (String) -> Unit)
+    fun abrirArticulo(id: String)
+}
+
+private val ESTADOS_PUB = listOf("idea", "preparando", "programada", "publicada")
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesPublicacion, imagen: (String) -> Any?, onVolver: () -> Unit) {
+    val c = Tinta.colores
+    val p = datos.publicaciones.firstOrNull { it.id == publicacionId }
+    if (p == null) {
+        Box(Modifier.fillMaxSize().background(c.papel), contentAlignment = Alignment.Center) { Text("Esta publicación ya no existe.", color = c.secundario) }
+        return
+    }
+    val canal = datos.canal(p.canalId)
+    val formato = canal?.formatos?.firstOrNull { it.id == p.formato }
+    var partes by remember(p.id) { mutableStateOf(p.partes.ifEmpty { listOf(Parte()) }) }
+    var titulo by remember(p.id) { mutableStateOf(p.titulo) }
+    var elegirFecha by remember { mutableStateOf(false) }
+    var elegirHora by remember { mutableStateOf(false) }
+    var pedirEnlace by remember { mutableStateOf(false) }
+    var confirmarBorrar by remember { mutableStateOf(false) }
+
+    LaunchedEffect(partes) { if (partes != p.partes) { delay(700); acciones.partes(partes) } }
+    LaunchedEffect(titulo) { if (titulo != p.titulo) { delay(700); acciones.cambiar(mapOf("titulo" to titulo)) } }
+
+    Column(Modifier.fillMaxSize().background(c.papel)) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", Modifier.size(38.dp).clip(RoundedCornerShape(99.dp)).clickable(onClick = onVolver).padding(9.dp), tint = c.texto)
+            IconoRed(canal?.icono ?: "")
+            BasicTextField(
+                titulo, { titulo = it.replace("\n", " ") }, Modifier.weight(1f),
+                textStyle = Estilos.ui.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.texto), singleLine = true,
+                cursorBrush = SolidColor(c.texto),
+                decorationBox = { campo -> if (titulo.isEmpty()) Text("Título", style = Estilos.ui, color = c.tenue); campo() },
+            )
+            Icon(Icons.Outlined.Delete, "Borrar", Modifier.size(38.dp).clip(RoundedCornerShape(99.dp)).clickable { confirmarBorrar = true }.padding(9.dp), tint = c.secundario)
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Tarjeta {
+                Campo("Fecha") { Text(fecha(p.fecha)?.let(::fechaCorta) ?: p.fecha, Modifier.clickable { elegirFecha = true }, style = Estilos.ui, color = c.texto) }
+                HorizontalDivider(color = c.linea)
+                Campo("Hora") {
+                    Text(p.hora ?: "Sin hora", Modifier.clickable { elegirHora = true }, style = Estilos.ui, color = if (p.hora == null) c.tenue else c.texto)
+                    if (p.hora != null) Text("Quitar", Modifier.padding(start = 12.dp).clickable { acciones.cambiar(mapOf("hora" to null)) }, style = Estilos.uiPeque, color = c.secundario)
+                }
+                HorizontalDivider(color = c.linea)
+                Campo("Formato") {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (f in canal?.formatos.orEmpty()) Chip(f.nombre, lleno = f.id == p.formato, onClick = {
+                            val nuevas = if (!f.partes && partes.size > 1) listOf(Parte(partes.joinToString("\n\n") { it.texto }, partes.flatMap { it.medios })) else null
+                            acciones.cambiar(mapOf("formato" to f.id))
+                            if (nuevas != null) partes = nuevas
+                        })
+                    }
+                }
+                HorizontalDivider(color = c.linea)
+                Campo("Estado") {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        for (e in ESTADOS_PUB) {
+                            val sel = e == p.estado
+                            val col = c.estado(e)
+                            Text(
+                                NOMBRE_ESTADO[e] ?: e,
+                                Modifier.clip(RoundedCornerShape(6.dp))
+                                    .background(if (sel) mezcla(col, 0.14f, c.hoja) else c.hoja)
+                                    .border(1.dp, if (sel) col else c.linea, RoundedCornerShape(6.dp))
+                                    .clickable { if (e == "publicada") pedirEnlace = true else acciones.cambiar(mapOf("estado" to e)) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = Estilos.uiPeque, color = if (sel) c.texto else c.secundario,
+                            )
+                        }
+                    }
+                }
+                p.articuloId?.let { aid ->
+                    HorizontalDivider(color = c.linea)
+                    Campo("Artículo") { Text(datos.titulo(aid), Modifier.clickable { acciones.abrirArticulo(aid) }, style = Estilos.ui, color = c.texto, maxLines = 1) }
+                }
+                p.enlace?.let { e ->
+                    HorizontalDivider(color = c.linea)
+                    Campo("Enlace") { Text(e, style = Estilos.uiPeque, color = c.texto, maxLines = 1) }
+                }
+            }
+            val limite = formato?.limite
+            Grupo(if (formato?.partes == true) "Posts del ${formato.nombre.lowercase()}" else "Texto")
+            partes.forEachIndexed { i, parte ->
+                EditorParte(
+                    parte, i, partes.size, limite, formato?.partes == true, imagen,
+                    onTexto = { t -> partes = partes.toMutableList().also { it[i] = parte.copy(texto = t) } },
+                    onCopiar = { acciones.copiar(parte.texto) },
+                    onPartir = {
+                        val (a, b) = partir(parte.texto, limite ?: Int.MAX_VALUE)
+                        partes = partes.toMutableList().also { it[i] = parte.copy(texto = a); it.add(i + 1, Parte(b)) }
+                    },
+                    onQuitar = { partes = partes.toMutableList().also { it.removeAt(i) } },
+                    onSubir = { if (i > 0) partes = partes.toMutableList().also { val x = it[i]; it[i] = it[i - 1]; it[i - 1] = x } },
+                    onBajar = { if (i < partes.size - 1) partes = partes.toMutableList().also { val x = it[i]; it[i] = it[i + 1]; it[i + 1] = x } },
+                    onImagen = { acciones.elegirImagen { id -> partes = partes.toMutableList().also { it[i] = it[i].copy(medios = it[i].medios + id) } } },
+                    onQuitarMedio = { m -> partes = partes.toMutableList().also { it[i] = it[i].copy(medios = it[i].medios - m) } },
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            if (formato?.partes == true) {
+                BotonPildora("Post", onClick = { partes = partes + Parte() }, icono = { Icon(Icons.Outlined.Add, null, Modifier.size(16.dp), tint = c.texto) })
+            }
+            Row(Modifier.padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BotonPildora("Copiar post 1", Modifier.weight(1f), onClick = { acciones.copiar(partes.firstOrNull()?.texto.orEmpty()) },
+                    icono = { Icon(Icons.Outlined.ContentCopy, null, Modifier.size(16.dp), tint = c.texto) })
+                BotonPildora("Publicada", Modifier.weight(1f), principal = true, onClick = { pedirEnlace = true },
+                    icono = { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp), tint = c.sobreTinta) })
+            }
+            Text("Tinta no publica por ti: copia el texto, publícalo en la red y marca aquí que salió.", Modifier.padding(bottom = 24.dp), style = Estilos.uiPeque, color = c.tenue)
+        }
+    }
+
+    if (elegirFecha) {
+        val inicial = fecha(p.fecha)?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+        val estado = rememberDatePickerState(initialSelectedDateMillis = inicial)
+        DatePickerDialog(
+            onDismissRequest = { elegirFecha = false },
+            confirmButton = {
+                TextButton({
+                    estado.selectedDateMillis?.let { ms -> acciones.cambiar(mapOf("fecha" to Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate().toString())) }
+                    elegirFecha = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton({ elegirFecha = false }) { Text("Cancelar") } },
+        ) { DatePicker(estado) }
+    }
+    if (elegirHora) {
+        val (h, m) = (p.hora ?: "09:00").split(":").map { it.toIntOrNull() ?: 0 }
+        val estado = rememberTimePickerState(h, m, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { elegirHora = false },
+            confirmButton = { TextButton({ acciones.cambiar(mapOf("hora" to "%02d:%02d".format(estado.hour, estado.minute))); elegirHora = false }) { Text("Aceptar") } },
+            dismissButton = { TextButton({ elegirHora = false }) { Text("Cancelar") } },
+            text = { TimePicker(estado) },
+        )
+    }
+    if (pedirEnlace) {
+        var enlace by remember { mutableStateOf(p.enlace.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { pedirEnlace = false },
+            title = { Text("Marcar como publicada") },
+            text = {
+                Column {
+                    Text("Pega el enlace del post para tenerlo a mano. Puedes dejarlo vacío.", style = Estilos.uiPeque, color = c.secundario)
+                    BasicTextField(
+                        enlace, { enlace = it.trim() },
+                        Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(8.dp)).background(c.gris).padding(10.dp),
+                        textStyle = Estilos.ui.copy(color = c.texto), singleLine = true, cursorBrush = SolidColor(c.texto),
+                    )
+                }
+            },
+            confirmButton = { TextButton({ acciones.publicada(enlace); pedirEnlace = false }) { Text("Publicada") } },
+            dismissButton = { TextButton({ pedirEnlace = false }) { Text("Cancelar") } },
+        )
+    }
+    if (confirmarBorrar) {
+        AlertDialog(
+            onDismissRequest = { confirmarBorrar = false },
+            title = { Text("¿Borrar esta publicación?") },
+            text = { Text("Sale del calendario en el móvil y en la web.") },
+            confirmButton = { TextButton({ confirmarBorrar = false; acciones.borrar() }) { Text("Borrar") } },
+            dismissButton = { TextButton({ confirmarBorrar = false }) { Text("Cancelar") } },
+        )
+    }
+}
+
+@Composable
+private fun Campo(etiqueta: String, contenido: @Composable () -> Unit) {
+    val c = Tinta.colores
+    Row(Modifier.fillMaxWidth().padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(etiqueta, Modifier.width(74.dp), style = Estilos.uiPeque.copy(fontSize = 13.sp), color = c.tenue)
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) { contenido() }
+    }
+}
+
+@Composable
+private fun EditorParte(
+    parte: Parte, i: Int, total: Int, limite: Int?, varias: Boolean, imagen: (String) -> Any?,
+    onTexto: (String) -> Unit, onCopiar: () -> Unit, onPartir: () -> Unit, onQuitar: () -> Unit,
+    onSubir: () -> Unit, onBajar: () -> Unit, onImagen: () -> Unit, onQuitarMedio: (String) -> Unit,
+) {
+    val c = Tinta.colores
+    val n = longitud(parte.texto)
+    val pasa = limite != null && n > limite
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.hoja)
+            .border(1.dp, if (pasa) c.texto else c.linea, RoundedCornerShape(14.dp)).padding(12.dp),
+    ) {
+        BasicTextField(
+            parte.texto, onTexto, Modifier.fillMaxWidth(),
+            textStyle = Estilos.ui.copy(color = c.texto, lineHeight = 21.sp), cursorBrush = SolidColor(c.texto),
+            decorationBox = { campo -> if (parte.texto.isEmpty()) Text("Escribe el post…", style = Estilos.ui, color = c.tenue); campo() },
+        )
+        if (parte.medios.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (m in parte.medios) Box(Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(c.gris).clickable { onQuitarMedio(m) }) {
+                imagen(m)?.let { AsyncImage(it, null, Modifier.fillMaxSize()) }
+                Icon(Icons.Outlined.Close, "Quitar", Modifier.align(Alignment.TopEnd).size(14.dp), tint = c.texto)
+            }
+        }
+        if (limite != null) {
+            Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(c.grisMedio)) {
+                Box(Modifier.fillMaxWidth((n.toFloat() / limite).coerceIn(0f, 1f)).height(3.dp).background(if (pasa) c.texto else c.secundario))
+            }
+        }
+        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(if (varias) "${i + 1} / $total" + if (pasa) " · se pasa" else "" else if (pasa) "se pasa" else "", style = Estilos.uiPeque, color = c.tenue)
+            Spacer(Modifier.weight(1f))
+            Accion(Icons.Outlined.Image, "Imagen", onImagen)
+            Accion(Icons.Outlined.ContentCopy, "Copiar", onCopiar)
+            if (varias && total > 1) {
+                Accion(Icons.Outlined.KeyboardArrowUp, "Subir", onSubir)
+                Accion(Icons.Outlined.KeyboardArrowDown, "Bajar", onBajar)
+                Accion(Icons.Outlined.Close, "Quitar", onQuitar)
+            }
+            if (limite != null) Text("$n / $limite", style = Estilos.uiPeque.copy(fontFamily = Mono, fontWeight = if (pasa) FontWeight.SemiBold else FontWeight.Normal), color = if (pasa) c.texto else c.tenue)
+        }
+        if (pasa && varias) Text("Partir en dos", Modifier.padding(top = 8.dp).clickable(onClick = onPartir), style = Estilos.ui.copy(fontWeight = FontWeight.Medium), color = c.texto)
+    }
+}
+
+@Composable
+private fun Accion(icono: androidx.compose.ui.graphics.vector.ImageVector, d: String, onClick: () -> Unit) {
+    Icon(icono, d, Modifier.size(20.dp).clickable(onClick = onClick), tint = Tinta.colores.secundario)
+}
+
+/** Ventana para crear una publicación: canal, formato y día. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DialogoNuevaPublicacion(canales: List<CanalE>, hoy: LocalDate, onCrear: (canal: String, formato: String, fecha: String) -> Unit, onCerrar: () -> Unit) {
+    val c = Tinta.colores
+    val activos = canales.filter { it.activo == 1 }
+    var canal by remember { mutableStateOf(activos.firstOrNull()) }
+    var formato by remember(canal) { mutableStateOf(canal?.formatos?.firstOrNull()) }
+    var dia by remember { mutableStateOf(hoy) }
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("Nueva publicación") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (k in activos) Chip(k.nombre, lleno = k.id == canal?.id, onClick = { canal = k }, icono = { IconoRed(k.icono, tam = 13.dp, color = if (k.id == canal?.id) c.sobreTinta else c.texto) })
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (f in canal?.formatos.orEmpty()) Chip(f.nombre, lleno = f.id == formato?.id, onClick = { formato = f })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("‹", Modifier.clickable { dia = dia.minusDays(1) }.padding(8.dp), style = Estilos.ui.copy(fontSize = 20.sp), color = c.texto)
+                    Text(fechaCorta(dia), style = Estilos.ui, color = c.texto)
+                    Text("›", Modifier.clickable { dia = dia.plusDays(1) }.padding(8.dp), style = Estilos.ui.copy(fontSize = 20.sp), color = c.texto)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton({ val k = canal ?: return@TextButton; val f = formato ?: return@TextButton; onCrear(k.id, f.id, dia.toString()) }, enabled = canal != null && formato != null) { Text("Crear") }
+        },
+        dismissButton = { TextButton(onCerrar) { Text("Cancelar") } },
+    )
+}

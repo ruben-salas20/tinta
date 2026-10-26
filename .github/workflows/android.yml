@@ -1,0 +1,89 @@
+# Compila la app de Android y publica sus versiones en GitHub Releases.
+#
+# - En cada PR y en cada cambio de main: pruebas y APK. Sin los secretos de
+#   firma, el APK sale sin firmar y queda como artefacto, con un aviso.
+# - En una etiqueta vX.Y.Z: el número de la versión sale de la etiqueta, el APK
+#   sale firmado (falla si faltan los secretos) y se crea la Release vX.Y.Z con
+#   tinta.apk y SHA256SUMS. Las novedades son el mensaje de la etiqueta. Una
+#   etiqueta con sufijo (v0.2.0-prueba1) crea una versión de prueba, que la app
+#   no ve como la última.
+#
+# imagen.yml también corre en las etiquetas v*, pero solo publica la imagen del
+# servicio: no toca la Release.
+name: Android
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        name: Versión de la etiqueta, o la de gradle.properties sin etiqueta
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag=${GITHUB_REF_NAME#v}
+            version=${tag%%-*}
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::La etiqueta $GITHUB_REF_NAME no es vX.Y.Z"
+              exit 1
+            fi
+            [[ "$tag" == *-* ]] && echo "prerelease=true" >> "$GITHUB_OUTPUT" || echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            version=$(sed -n 's/^tintaVersion=//p' android/gradle.properties)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: SDK de Android 37
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" > /dev/null
+      - name: Pruebas y APK
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
+          TINTA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [[ -n "$KEYSTORE_B64" ]]; then
+            export TINTA_KEYSTORE="$RUNNER_TEMP/tinta.jks"
+            base64 -d <<< "$KEYSTORE_B64" > "$TINTA_KEYSTORE"
+            apk=app-release.apk
+          elif [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            echo "::error::Falta el secreto ANDROID_KEYSTORE: una versión publicada debe ir firmada"
+            exit 1
+          else
+            echo "::warning::Sin el secreto ANDROID_KEYSTORE: el APK sale sin firmar"
+            apk=app-release-unsigned.apk
+          fi
+          cd android
+          ./gradlew -PtintaVersion="${{ steps.v.outputs.version }}" testDebugUnitTest assembleRelease
+          cp "app/build/outputs/apk/release/$apk" "$GITHUB_WORKSPACE/tinta.apk"
+          rm -f "$RUNNER_TEMP/tinta.jks"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: tinta.apk
+      - name: Crear la Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # checkout no trae el mensaje de una etiqueta anotada: se pide aparte.
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > novedades.md
+          sha256sum tinta.apk > SHA256SUMS
+          flags=()
+          [[ "${{ steps.v.outputs.prerelease }}" == true ]] && flags+=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" tinta.apk SHA256SUMS \
+            --title "Tinta ${{ steps.v.outputs.version }}" --notes-file novedades.md "${flags[@]}"

@@ -4,6 +4,7 @@
   import Entrar from './vistas/Entrar.svelte';
   import Articulos from './vistas/Articulos.svelte';
   import Editor from './vistas/Editor.svelte';
+  import Calendario from './vistas/Calendario.svelte';
 
   let sesion = $state<'comprobando' | 'si' | 'no'>('comprobando');
 
@@ -39,6 +40,8 @@
     {#key editor.articulo}
       <Editor articuloId={editor.articulo} idiomaUrl={editor.idioma} ramaUrl={editor.rama} />
     {/key}
+  {:else if nav.ruta.startsWith('/calendario')}
+    <Calendario />
   {:else}
     <Articulos />
   {/if}

@@ -113,6 +113,29 @@ Tipos de bloque: `parrafo`, `subtitulo`, `lista`, `cita`, `codigo`, `imagen`, `a
 
 Medios admitidos: imágenes PNG, JPEG, GIF, WebP, SVG y AVIF, y audios MP3, M4A, OGG, WAV, WebM y AAC. Es lo que el portfolio sabe mostrar. Los vídeos son siempre enlaces de YouTube.
 
+### Calendario
+
+Las fechas van en `AAAA-MM-DD` y las horas en `HH:MM`, en la hora local de Rubén y sin zona. La zona sale de `TINTA_ZONA` (por ejemplo, `America/Bogota`); sin ella, UTC.
+
+| Método y ruta | Cuerpo | Devuelve |
+|---|---|---|
+| `GET /api/hoy` | | `{fecha, zona}`: el «hoy» del servicio |
+| `GET /api/canales` | | `[Canal]`, en orden. Cada uno trae `formatos: [{id, nombre, limite, partes}]` y `activo` |
+| `POST /api/canales` | `{nombre, icono, formatos}` | 201 y el canal |
+| `PATCH /api/canales/{id}` | `{nombre?, activo?, formatos?}` | El canal |
+| `GET /api/publicaciones?desde&hasta&canal&articulo` | | `[Publicacion]`, por fecha y hora. Los cuatro filtros son opcionales; las fechas, incluidas |
+| `POST /api/publicaciones` | `{canal_id, formato, fecha, hora?, estado = "idea", titulo?, partes?, articulo_id?}` | 201 y la publicación |
+| `GET /api/publicaciones/{id}` | | `Publicacion` |
+| `PATCH /api/publicaciones/{id}` | Cualquier campo de los de crear, más `enlace`. `null` vacía `hora`, `articulo_id` o `enlace` | `Publicacion` |
+| `DELETE /api/publicaciones/{id}` | | 204 |
+| `POST /api/articulos/{id}/difusion` | `[{canal_id, formato, fecha, hora?}]` | 201 y las publicaciones nuevas, en estado `idea` con el título del artículo. Salvo en el portfolio, su texto empieza con la descripción |
+
+- **Estados:** `idea`, `preparando`, `programada` y `publicada`.
+- **Partes:** `[{texto, medios: [id]}]`. Un formato con `partes: false` admite una sola; un hilo de X, varias. `limite` son los caracteres por parte; la web cuenta, el servicio no corta.
+- **Canales de serie:** `x`, `linkedin`, `instagram` y `portfolio`, activos; `youtube` y `tiktok`, inactivos hasta que se activen.
+- **El portfolio manda en la fecha del artículo.** Crear o mover una publicación del canal `portfolio` que sale de un artículo cambia su `fecha`, que es la `date` del `.md` exportado.
+- `Articulo` trae `proxima: {canal_id, fecha, hora} | null`: la siguiente publicación sin publicar desde hoy.
+
 ## Lo que falta para Android (fase 4)
 
 Cada tabla ya lleva `rev` y lápidas (`borrado`), y el contador global está en `meta.rev`. Falta la ruta de sincronización: «dame lo que cambió desde la rev N» y «aquí va mi cola de cambios». Se diseña en la fase 4.

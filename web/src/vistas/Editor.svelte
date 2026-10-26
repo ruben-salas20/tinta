@@ -9,12 +9,14 @@
   import Lateral from '../componentes/Lateral.svelte';
   import Seccion from '../componentes/Seccion.svelte';
   import Exportar from './Exportar.svelte';
+  import PlanearDifusion from '../componentes/PlanearDifusion.svelte';
 
   let { articuloId, idiomaUrl, ramaUrl }: { articuloId: string; idiomaUrl: string | null; ramaUrl: string | null } = $props();
 
   const ctl = new ControlEditor();
   let error = $state<string | null>(null);
   let exportar = $state(false);
+  let planear = $state(false);
   let menu = $state<'estado' | 'rama' | 'serie' | 'en' | null>(null);
   let pedidoHistorial = $state(0);
 
@@ -214,6 +216,7 @@
             </div>
           {/if}
         </span>
+        <button class="btn" onclick={() => (planear = true)}><Icono n="difundir" />Planear difusión</button>
         <button class="btn" onclick={abrirExportar}><Icono n="copiar" />Copiar para X</button>
         <button class="btn primario" onclick={abrirExportar}><Icono n="descargar" />Exportar</button>
       {/if}
@@ -285,6 +288,14 @@
     {/if}
   </div>
 </div>
+
+{#if planear && a}
+  <PlanearDifusion
+    articulo={a}
+    alCerrar={() => (planear = false)}
+    alPlanear={async () => { ctl.articulo = await api.articulo(a.id); }}
+  />
+{/if}
 
 {#if exportar && a && idioma}
   <Exportar articulo={a} idioma={idioma.idioma} alCerrar={() => (exportar = false)} />

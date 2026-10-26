@@ -4,6 +4,7 @@
 //! `Authorization: Bearer <TINTA_API_KEY>` de la app. `/health` y la propia
 //! web (los archivos estáticos) son libres; la web pide entrar si no hay sesión.
 
+use crate::calendario;
 use crate::critic::Decision;
 use crate::exportar;
 use crate::modelo::{self, Error};
@@ -429,6 +430,49 @@ async fn medio(State(e): State<Estado>, Path(id): Path<String>, req: Request) ->
     Ok(r)
 }
 
+// --- Calendario
+
+async fn canales(State(e): State<Estado>) -> R<Json<Vec<calendario::Canal>>> {
+    Ok(Json(e.con(|c| calendario::listar_canales(c))?))
+}
+
+async fn crear_canal(State(e): State<Estado>, Json(b): Json<calendario::NuevoCanal>) -> R<(StatusCode, Json<calendario::Canal>)> {
+    Ok((StatusCode::CREATED, Json(e.con(|c| calendario::crear_canal(c, b))?)))
+}
+
+async fn cambiar_canal(State(e): State<Estado>, Path(id): Path<String>, Json(b): Json<calendario::CambioCanal>) -> R<Json<calendario::Canal>> {
+    Ok(Json(e.con(|c| calendario::actualizar_canal(c, &id, b))?))
+}
+
+async fn publicaciones(State(e): State<Estado>, Query(f): Query<calendario::Filtro>) -> R<Json<Vec<calendario::Publicacion>>> {
+    Ok(Json(e.con(|c| calendario::listar_publicaciones(c, &f))?))
+}
+
+async fn crear_publicacion(State(e): State<Estado>, Json(b): Json<calendario::NuevaPublicacion>) -> R<(StatusCode, Json<calendario::Publicacion>)> {
+    Ok((StatusCode::CREATED, Json(e.con(|c| calendario::crear_publicacion(c, b))?)))
+}
+
+async fn publicacion(State(e): State<Estado>, Path(id): Path<String>) -> R<Json<calendario::Publicacion>> {
+    Ok(Json(e.con(|c| calendario::publicacion(c, &id))?))
+}
+
+async fn cambiar_publicacion(State(e): State<Estado>, Path(id): Path<String>, Json(b): Json<calendario::CambioPublicacion>) -> R<Json<calendario::Publicacion>> {
+    Ok(Json(e.con(|c| calendario::actualizar_publicacion(c, &id, b))?))
+}
+
+async fn borrar_publicacion(State(e): State<Estado>, Path(id): Path<String>) -> R<StatusCode> {
+    e.con(|c| calendario::borrar_publicacion(c, &id))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn difusion(State(e): State<Estado>, Path(id): Path<String>, Json(b): Json<Vec<calendario::Plan>>) -> R<(StatusCode, Json<Vec<calendario::Publicacion>>)> {
+    Ok((StatusCode::CREATED, Json(e.con(|c| calendario::planear_difusion(c, &id, b))?)))
+}
+
+async fn hoy() -> Json<Value> {
+    Json(json!({ "fecha": calendario::hoy(), "zona": calendario::zona().name() }))
+}
+
 pub fn rutas(e: Estado) -> Router {
     let api = Router::new()
         .route("/sesion", get(yo))
@@ -458,6 +502,12 @@ pub fn rutas(e: Estado) -> Router {
         .route("/series/{id}", axum::routing::patch(renombrar_serie).delete(borrar_serie))
         .route("/medios", post(subir_medio).layer(DefaultBodyLimit::max(300 * 1024 * 1024)))
         .route("/medios/{id}", get(medio))
+        .route("/hoy", get(hoy))
+        .route("/canales", get(canales).post(crear_canal))
+        .route("/canales/{id}", axum::routing::patch(cambiar_canal))
+        .route("/publicaciones", get(publicaciones).post(crear_publicacion))
+        .route("/publicaciones/{id}", get(publicacion).patch(cambiar_publicacion).delete(borrar_publicacion))
+        .route("/articulos/{id}/difusion", post(difusion))
         .route_layer(middleware::from_fn_with_state(e.clone(), exigir_acceso))
         // Entrar y salir van fuera del control de acceso.
         .route("/entrar", post(entrar))

@@ -52,6 +52,68 @@ export interface Articulo {
   cambiado: string;
   idiomas: IdiomaDetalle[];
   senales: Senales;
+  proxima: Proxima | null;
+}
+
+// --- Calendario (crates/tinta-server/src/calendario.rs)
+export interface Proxima {
+  canal_id: string;
+  fecha: string;
+  hora: string | null;
+}
+export interface Formato {
+  id: string;
+  nombre: string;
+  /** Caracteres por parte; null si el canal no pone límite. */
+  limite: number | null;
+  /** true si admite varias partes, como un hilo. */
+  partes: boolean;
+}
+export interface Canal {
+  id: string;
+  nombre: string;
+  icono: string;
+  formatos: Formato[];
+  activo: boolean;
+  posicion: string;
+}
+export interface Parte {
+  texto: string;
+  medios: string[];
+}
+export type EstadoPub = 'idea' | 'preparando' | 'programada' | 'publicada';
+export interface Publicacion {
+  id: string;
+  canal_id: string;
+  formato: string;
+  fecha: string;
+  hora: string | null;
+  estado: EstadoPub;
+  titulo: string;
+  partes: Parte[];
+  articulo: { id: string; titulo: string; slug: string } | null;
+  enlace: string | null;
+  origen: string;
+  creado: string;
+  cambiado: string;
+  rev: number;
+}
+export interface Plan {
+  canal_id: string;
+  formato: string;
+  fecha: string;
+  hora: string | null;
+}
+export interface CambioPublicacion {
+  canal_id?: string;
+  formato?: string;
+  fecha?: string;
+  hora?: string | null;
+  estado?: EstadoPub;
+  titulo?: string;
+  partes?: Parte[];
+  articulo_id?: string | null;
+  enlace?: string | null;
 }
 export interface VarianteBloque {
   id: string;
@@ -223,6 +285,19 @@ export const api = {
   resolverMarca: (id: string, indice: number, decision: 'aceptar' | 'rechazar') =>
     post<Guardado>(`/variantes-bloque/${id}/marcas`, { indice, decision }),
 
+  hoy: () => get<{ fecha: string; zona: string }>('/hoy'),
+  canales: () => get<Canal[]>('/canales'),
+  cambiarCanal: (id: string, c: { activo?: boolean; nombre?: string }) => patch<Canal>(`/canales/${id}`, c),
+  publicaciones: (f: { desde?: string; hasta?: string; canal?: string; articulo?: string }) => {
+    const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]);
+    return get<Publicacion[]>(`/publicaciones?${q}`);
+  },
+  publicacion: (id: string) => get<Publicacion>(`/publicaciones/${id}`),
+  crearPublicacion: (p: CambioPublicacion & { canal_id: string; formato: string; fecha: string }) => post<Publicacion>('/publicaciones', p),
+  cambiarPublicacion: (id: string, c: CambioPublicacion) => patch<Publicacion>(`/publicaciones/${id}`, c),
+  borrarPublicacion: (id: string) => del<void>(`/publicaciones/${id}`),
+  difusion: (articuloId: string, planes: Plan[]) => post<Publicacion[]>(`/articulos/${articuloId}/difusion`, planes),
+
   etiquetas: () => get<Etiqueta[]>('/etiquetas'),
   series: () => get<SerieConCuenta[]>('/series'),
   crearSerie: (nombre: string) => post<Serie>('/series', { nombre }),
@@ -244,6 +319,14 @@ export const NOMBRE_ESTADO: Record<Estado, string> = {
   publicado: 'Publicado',
 };
 export const ESTADOS = Object.keys(NOMBRE_ESTADO) as Estado[];
+
+export const NOMBRE_ESTADO_PUB: Record<EstadoPub, string> = {
+  idea: 'Idea',
+  preparando: 'Preparando',
+  programada: 'Programada',
+  publicada: 'Publicada',
+};
+export const ESTADOS_PUB = Object.keys(NOMBRE_ESTADO_PUB) as EstadoPub[];
 
 export function cuando(iso: string): string {
   const d = new Date(iso);

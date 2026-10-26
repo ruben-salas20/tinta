@@ -1,9 +1,10 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { api, cuando, quien, type EntradaHistorial, type IdiomaDetalle, type VarianteBloque } from '../lib/api';
+  import { api, cuando, NOMBRE_ESTADO_PUB, quien, type EntradaHistorial, type IdiomaDetalle, type Publicacion, type VarianteBloque } from '../lib/api';
+  import { fechaCorta } from '../lib/calendario';
   import { contar, vistazo } from '../lib/critic';
   import { activaBloque, activaSeccion, type ControlEditor } from '../lib/editor.svelte';
-  import { confirmar, fallo, ir, pedirTexto } from '../lib/estado.svelte';
+  import { canal, confirmar, difusion, fallo, ir, pedirTexto } from '../lib/estado.svelte';
   import Icono from './Icono.svelte';
 
   let { ctl, idioma, pedidoHistorial }: { ctl: ControlEditor; idioma: IdiomaDetalle; pedidoHistorial: number } = $props();
@@ -16,6 +17,13 @@
   const articuloId = $derived(ctl.articulo?.id ?? '');
 
   let comparar = $state<VarianteBloque | null>(null);
+
+  let pubs = $state<Publicacion[]>([]);
+  $effect(() => {
+    const id = articuloId;
+    void difusion.version;
+    if (id) api.publicaciones({ articulo: id }).then((x) => (pubs = x)).catch(fallo);
+  });
   let historial = $state<EntradaHistorial[] | null>(null);
   let seccionHistorial: HTMLElement | undefined = $state();
 
@@ -180,6 +188,21 @@
     </div>
   {/if}
 
+  <div class="difusion">
+    <h3><Icono n="difundir" s />Difusión<span class="n">{pubs.length || ''}</span></h3>
+    {#if pubs.length}
+      {#each pubs as p (p.id)}
+        <a class="pub-d" href="/calendario?fecha={p.fecha}&p={p.id}" onclick={(e) => { e.preventDefault(); ir(`/calendario?fecha=${p.fecha}&p=${p.id}`); }}>
+          <Icono n={canal(p.canal_id)?.icono ?? 'x'} red />
+          <span class="f">{fechaCorta(p.fecha)}{p.hora ? ` · ${p.hora}` : ''}</span>
+          <span class="chip punto e-{p.estado}">{NOMBRE_ESTADO_PUB[p.estado]}</span>
+        </a>
+      {/each}
+    {:else}
+      <p class="vacio">Sin planear. «Planear difusión», arriba, lo pone en el calendario.</p>
+    {/if}
+  </div>
+
   <div class="ramas">
     <h3><Icono n="rama" s />Ramas del artículo<span class="n">{idioma.ramas.length}</span></h3>
     {#each idioma.ramas as r (r.id)}
@@ -269,4 +292,8 @@
   .dos div { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
   .dos small { color: var(--faint); font-size: 12px; }
   .dos p { margin: 6px 0 0; font: 15px/1.6 var(--serif); color: var(--text); }
+  .difusion .pub-d { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; font-size: 13px; text-decoration: none; color: var(--text); }
+  .difusion .pub-d:hover { background: var(--surface-2); }
+  .difusion .pub-d .f { flex: 1; text-transform: capitalize; }
+  .difusion .vacio { margin: 0; font-size: 12.5px; color: var(--faint); }
 </style>

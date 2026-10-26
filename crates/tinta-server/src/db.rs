@@ -133,6 +133,46 @@ CREATE TABLE sesiones (
   creado TEXT NOT NULL,
   caduca TEXT NOT NULL
 );
+"#, r#"
+-- Fase 2: calendario.
+-- formatos: JSON [{"id", "nombre", "limite" (caracteres por parte, o null), "partes" (true si admite varias, como un hilo)}]
+-- icono: el del archivo redes.svg de la web.
+CREATE TABLE canales (
+  id TEXT PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  icono TEXT NOT NULL,
+  formatos TEXT NOT NULL,
+  activo INTEGER NOT NULL DEFAULT 1,
+  posicion TEXT NOT NULL,
+  rev INTEGER NOT NULL, borrado INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO canales VALUES
+ ('x', 'X', 'x', '[{"id":"post","nombre":"Post","limite":280,"partes":false},{"id":"hilo","nombre":"Hilo","limite":280,"partes":true},{"id":"articulo","nombre":"Artículo","limite":null,"partes":false}]', 1, 'a', 0, 0),
+ ('linkedin', 'LinkedIn', 'linkedin', '[{"id":"post","nombre":"Post","limite":3000,"partes":false},{"id":"articulo","nombre":"Artículo","limite":null,"partes":false}]', 1, 'b', 0, 0),
+ ('instagram', 'Instagram', 'instagram', '[{"id":"post","nombre":"Post","limite":2200,"partes":false},{"id":"carrusel","nombre":"Carrusel","limite":2200,"partes":false},{"id":"reel","nombre":"Reel","limite":2200,"partes":false}]', 1, 'c', 0, 0),
+ ('portfolio', 'Portfolio', 'portfolio', '[{"id":"articulo","nombre":"Artículo","limite":null,"partes":false}]', 1, 'd', 0, 0),
+ ('youtube', 'YouTube', 'youtube', '[{"id":"video","nombre":"Vídeo","limite":5000,"partes":false},{"id":"short","nombre":"Short","limite":5000,"partes":false}]', 0, 'e', 0, 0),
+ ('tiktok', 'TikTok', 'tiktok', '[{"id":"video","nombre":"Vídeo","limite":4000,"partes":false}]', 0, 'f', 0, 0);
+
+-- estado: idea | preparando | programada | publicada
+-- fecha AAAA-MM-DD y hora HH:MM, en hora local de Rubén, sin zona.
+-- partes: JSON [{"texto", "medios": [id]}]. Un post tiene una; un hilo, varias.
+CREATE TABLE publicaciones (
+  id TEXT PRIMARY KEY,
+  canal_id TEXT NOT NULL REFERENCES canales(id),
+  formato TEXT NOT NULL,
+  fecha TEXT NOT NULL,
+  hora TEXT,
+  estado TEXT NOT NULL DEFAULT 'idea',
+  titulo TEXT NOT NULL DEFAULT '',
+  partes TEXT NOT NULL DEFAULT '[{"texto":"","medios":[]}]',
+  articulo_id TEXT REFERENCES articulos(id),
+  enlace TEXT,
+  origen TEXT NOT NULL DEFAULT 'tu',
+  creado TEXT NOT NULL, cambiado TEXT NOT NULL,
+  rev INTEGER NOT NULL, borrado INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX publicaciones_fecha ON publicaciones(fecha) WHERE borrado = 0;
 "#];
 
 pub fn abrir(ruta: &Path) -> rusqlite::Result<Connection> {

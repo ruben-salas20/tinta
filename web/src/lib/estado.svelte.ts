@@ -1,6 +1,6 @@
 // Estado compartido por las vistas: ruta, avisos, diálogos y catálogo.
 
-import { api, type Articulo, type Etiqueta, type SerieConCuenta } from './api';
+import { api, type Articulo, type Canal, type Etiqueta, type SerieConCuenta } from './api';
 
 export const nav = $state({ ruta: location.pathname, buscar: location.search });
 
@@ -83,19 +83,36 @@ export function confirmar(texto: string, aceptar = 'Borrar'): Promise<boolean> {
   });
 }
 
-export const catalogo = $state<{ articulos: Articulo[]; series: SerieConCuenta[]; etiquetas: Etiqueta[]; cargado: boolean }>({
+export const catalogo = $state<{
+  articulos: Articulo[];
+  series: SerieConCuenta[];
+  etiquetas: Etiqueta[];
+  canales: Canal[];
+  /** «Hoy» según la zona del servicio, AAAA-MM-DD. */
+  hoy: string;
+  cargado: boolean;
+}>({
   articulos: [],
   series: [],
   etiquetas: [],
+  canales: [],
+  hoy: new Date().toISOString().slice(0, 10),
   cargado: false,
 });
 
+/** Sube cada vez que cambian las publicaciones, para quien las muestre. */
+export const difusion = $state({ version: 0 });
+
+export const canal = (id: string) => catalogo.canales.find((c) => c.id === id);
+
 export async function recargarCatalogo() {
   try {
-    const [a, s, e] = await Promise.all([api.articulos(), api.series(), api.etiquetas()]);
+    const [a, s, e, c, h] = await Promise.all([api.articulos(), api.series(), api.etiquetas(), api.canales(), api.hoy()]);
     catalogo.articulos = a;
     catalogo.series = s;
     catalogo.etiquetas = e;
+    catalogo.canales = c;
+    catalogo.hoy = h.fecha;
     catalogo.cargado = true;
   } catch (e) {
     fallo(e);

@@ -17,6 +17,7 @@ docker run -d --name tinta-dev \
   --user "$(id -u):$(id -g)" \
   -p "$ip:8091:8080" \
   -e TINTA_API_KEY=dev-clave -e TINTA_WEB_PASSWORD=tinta -e TINTA_COOKIE_INSEGURA=1 \
+  -e TINTA_ZONA=America/Bogota \
   -e RUST_LOG=tinta_server=debug \
   -v "$raiz/target/debug/tinta-server:/usr/local/bin/tinta-server:ro" \
   -v "$raiz/datos-dev:/data" \

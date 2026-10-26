@@ -163,7 +163,7 @@ pub fn exportar_idioma(c: &Connection, idioma_id: &str) -> Res<Exportado> {
     }
     let cuerpo = partes.join("\n\n");
 
-    let fecha = a.fecha.clone().unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+    let fecha = a.fecha.clone().unwrap_or_else(crate::calendario::hoy);
     let mut fm = format!("---\ntitle: {}\ndescription: {}\ndate: {fecha}\n", yaml(&i.titulo), yaml(&i.descripcion));
     if i.borrador {
         fm.push_str("draft: true\n");

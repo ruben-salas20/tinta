@@ -133,6 +133,8 @@ pub struct Articulo {
     pub cambiado: String,
     pub idiomas: Vec<IdiomaDetalle>,
     pub senales: Senales,
+    /// Lo siguiente que toca publicar de este artículo, si hay algo planeado.
+    pub proxima: Option<crate::calendario::Proxima>,
 }
 
 fn leer_idioma(r: &Row) -> rusqlite::Result<IdiomaResumen> {
@@ -188,6 +190,7 @@ pub fn articulo(c: &Connection, id: &str) -> Res<Articulo> {
                     cambiado: r.get("cambiado")?,
                     idiomas: vec![],
                     senales: Senales::default(),
+                    proxima: None,
                 })
             },
         )
@@ -245,6 +248,7 @@ pub fn articulo(c: &Connection, id: &str) -> Res<Articulo> {
         }
         a.idiomas.push(IdiomaDetalle { resumen: i, ramas });
     }
+    a.proxima = crate::calendario::proxima(c, id, &crate::calendario::hoy())?;
     Ok(a)
 }
 

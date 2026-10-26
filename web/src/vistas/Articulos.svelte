@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, cuando, ESTADOS, NOMBRE_ESTADO, type Articulo, type Estado } from '../lib/api';
-  import { catalogo, fallo, ir, nav, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
+  import { canal, catalogo, fallo, ir, nav, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
+  import { fechaCorta } from '../lib/calendario';
   import Icono from '../componentes/Icono.svelte';
   import Lateral from '../componentes/Lateral.svelte';
 
@@ -76,7 +77,7 @@
       {/each}
     </div>
     <div class="prox">
-      {#if a.fecha}<Icono n="portfolio" red />{new Date(a.fecha + 'T12:00').toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}{:else}<span class="vacio">Sin fecha</span>{/if}
+      {#if a.proxima}<Icono n={canal(a.proxima.canal_id)?.icono ?? 'x'} red /><span title={canal(a.proxima.canal_id)?.nombre}>{fechaCorta(a.proxima.fecha)}</span>{:else}<span class="vacio">Sin planear</span>{/if}
     </div>
     <span class="peq">{cuando(a.cambiado)}</span>
   </a>
@@ -120,7 +121,7 @@
         {#if enMarcha.length}
           <div class="grupo-t">En marcha <span class="chip">{enMarcha.length}</span></div>
           <div class="lista">
-            <div class="fila cab"><span>Artículo</span><span>Serie</span><span>Idiomas</span><span>Fecha</span><span>Cambiado</span></div>
+            <div class="fila cab"><span>Artículo</span><span>Serie</span><span>Idiomas</span><span>Próxima publicación</span><span>Cambiado</span></div>
             {#each enMarcha as a (a.id)}{@render fila(a)}{/each}
           </div>
         {/if}

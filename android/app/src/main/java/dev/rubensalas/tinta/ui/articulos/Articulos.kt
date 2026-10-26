@@ -22,11 +22,14 @@ import androidx.compose.material.icons.outlined.CallSplit
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.StickyNote2
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,7 +54,7 @@ import java.time.LocalDate
 private val FILTROS = listOf(null to "Todos", "idea" to "Ideas", "borrador" to "Borradores", "revision" to "Revisión", "listo" to "Listos", "publicado" to "Publicados")
 
 @Composable
-fun PantallaArticulos(datos: Datos, hoy: LocalDate, onArticulo: (String) -> Unit, onNuevo: () -> Unit) {
+fun PantallaArticulos(datos: Datos, hoy: LocalDate, onArticulo: (String) -> Unit, onNuevo: () -> Unit, onEliminar: (String) -> Unit = {}) {
     val c = Tinta.colores
     var buscar by rememberSaveable { mutableStateOf("") }
     var filtro by rememberSaveable { mutableStateOf<String?>(null) }
@@ -89,7 +92,11 @@ fun PantallaArticulos(datos: Datos, hoy: LocalDate, onArticulo: (String) -> Unit
                     val i = datos.idiomaPrincipal(a.id)
                     val s = datos.senales(a.id)
                     val p = datos.proxima(a.id, hoy.toString())
-                    Tarjeta(onClick = { onArticulo(a.id) }) {
+                    var menu by remember { mutableStateOf(false) }
+                    Tarjeta(onClick = { onArticulo(a.id) }, onLongClick = { menu = true }) {
+                        DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem({ Text("Eliminar") }, { menu = false; onEliminar(a.id) })
+                        }
                         Text(datos.titulo(a.id), style = Estilos.tarjetaTitulo, color = c.texto)
                         if (!i?.descripcion.isNullOrBlank()) {
                             Text(
@@ -100,14 +107,19 @@ fun PantallaArticulos(datos: Datos, hoy: LocalDate, onArticulo: (String) -> Unit
                         Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             ChipEstado(a.estado)
-                            datos.serie(a.serieId)?.let { Text("${it.nombre}${a.serieParte?.let { n -> " · $n" } ?: ""}", style = Estilos.uiPeque, color = c.secundario, maxLines = 1) }
-                            Spacer(Modifier.weight(1f))
+                            // La serie cede sitio y se corta: la fecha y las señales nunca se parten.
+                            datos.serie(a.serieId)?.let {
+                                Text(
+                                    "${it.nombre}${a.serieParte?.let { n -> " · $n" } ?: ""}", Modifier.weight(1f),
+                                    style = Estilos.uiPeque, color = c.secundario, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                )
+                            } ?: Spacer(Modifier.weight(1f))
                             if (s.propuestas > 0) Senal(Icons.Outlined.SmartToy, s.propuestas)
                             if (s.notas > 0) Senal(Icons.Outlined.StickyNote2, s.notas)
                             if (s.conflictos > 0) Senal(Icons.Outlined.CallSplit, s.conflictos)
                             if (p != null) {
                                 IconoRed(datos.canal(p.canalId)?.icono ?: "", tam = 13.dp)
-                                Text(cuando(p.fecha, hoy), style = Estilos.uiPeque, color = c.secundario)
+                                Text(cuando(p.fecha, hoy), style = Estilos.uiPeque, color = c.secundario, maxLines = 1, softWrap = false)
                             }
                         }
                     }

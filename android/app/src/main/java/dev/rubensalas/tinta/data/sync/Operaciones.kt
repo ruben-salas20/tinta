@@ -47,6 +47,8 @@ object Op {
 
     fun cambiarArticulo(id: String, cambio: JsonObject) = buildJsonObject { put("op", "cambiar_articulo"); put("id", id); put("cambio", cambio) }
     fun cambiarIdioma(id: String, cambio: JsonObject) = buildJsonObject { put("op", "cambiar_idioma"); put("id", id); put("cambio", cambio) }
+    fun borrarArticulo(id: String) = buildJsonObject { put("op", "borrar_articulo"); put("id", id) }
+    fun restaurarArticulo(id: String) = buildJsonObject { put("op", "restaurar_articulo"); put("id", id) }
 
     fun crearSeccion(ramaId: String, titulo: String, antes: String?, despues: String?) = buildJsonObject {
         put("op", "crear_seccion"); put("rama_id", ramaId); put("titulo", titulo)
@@ -123,6 +125,8 @@ class Local(private val dao: DaoTinta) {
                     cambiado = ahora(),
                 )))
             }
+            "borrar_articulo" -> borrarArticulo(o.texto("id")!!)
+            "restaurar_articulo" -> restaurarArticulo(o.texto("id")!!)
             "cambiar_idioma" -> dao.idioma(o.texto("id")!!)?.let { i ->
                 val c = o["cambio"]!!.jsonObject
                 dao.idiomas(listOf(i.copy(
@@ -175,6 +179,24 @@ class Local(private val dao: DaoTinta) {
         dao.variantesSeccion(listOf(VarianteSeccionE(o.id("variante_seccion"), o.id("seccion"), creado = t, rev = -1)))
         dao.bloques(listOf(BloqueE(o.id("bloque"), o.id("variante_seccion"), Posicion.entre(null, null), varianteActivaId = o.id("variante_bloque"), rev = -1)))
         dao.variantesBloque(listOf(VarianteBloqueE(o.id("variante_bloque"), o.id("bloque"), creado = t, cambiado = t, rev = -1)))
+    }
+
+    /**
+     * Como `modelo::borrar_articulo`: el artículo y sus publicaciones sin
+     * publicar. Estas toman la rev del artículo, igual que en el servicio,
+     * y así [restaurarArticulo] sabe cuáles se fueron con él.
+     */
+    private suspend fun borrarArticulo(id: String) {
+        val a = dao.articulo(id) ?: return
+        dao.articulos(listOf(a.copy(borrado = 1)))
+        dao.publicaciones(dao.publicacionesDe(id).filter { it.borrado == 0 && it.estado != "publicada" }.map { it.copy(borrado = 1, rev = a.rev) })
+    }
+
+    private suspend fun restaurarArticulo(id: String) {
+        val a = dao.articulo(id) ?: return
+        if (a.borrado == 0) return
+        dao.articulos(listOf(a.copy(borrado = 0, cambiado = ahora())))
+        dao.publicaciones(dao.publicacionesDe(id).filter { it.borrado == 1 && it.rev == a.rev }.map { it.copy(borrado = 0) })
     }
 
     private suspend fun crearSeccion(o: JsonObject) {

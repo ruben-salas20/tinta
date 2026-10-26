@@ -3,12 +3,23 @@ package dev.rubensalas.tinta.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.rubensalas.tinta.ui.ajustes.PantallaInicio
+import dev.rubensalas.tinta.ui.articulos.AvisoDeshacer
+import dev.rubensalas.tinta.ui.articulos.DialogoEliminarArticulo
 import dev.rubensalas.tinta.ui.articulos.PantallaArticulos
 import dev.rubensalas.tinta.ui.calendario.PantallaCalendario
 import dev.rubensalas.tinta.ui.calendario.PantallaPublicacion
@@ -87,6 +98,29 @@ class CapturasTest(private val oscuro: Boolean) {
 
     @Test fun publicacion() = capturar("6b-publicacion") {
         PantallaPublicacion(d, "p-hilo", Muestras.accionesPublicacion, { null }, onVolver = {})
+    }
+
+    @Test fun eliminarDialogo() {
+        compose.setContent {
+            TemaTinta(oscuro = oscuro) {
+                ConBarra(Seccion.Articulos) { PantallaArticulos(d, Muestras.hoy, onArticulo = {}, onNuevo = {}) }
+                DialogoEliminarArticulo(d.titulo("llama"), {}, {})
+            }
+        }
+        compose.waitForIdle()
+        // El diálogo va en su propia ventana: se captura la pantalla entera.
+        captureScreenRoboImage("build/outputs/roborazzi/7a-eliminar-$tema.png")
+    }
+
+    @Test fun eliminarDeshacer() = capturar("7b-deshacer") {
+        val aviso = remember { SnackbarHostState() }
+        LaunchedEffect(Unit) { aviso.showSnackbar("Artículo eliminado", "Deshacer", duration = SnackbarDuration.Indefinite) }
+        ConBarra(Seccion.Articulos) {
+            Box(Modifier.fillMaxSize()) {
+                PantallaArticulos(d, Muestras.hoy, onArticulo = {}, onNuevo = {})
+                SnackbarHost(aviso, Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 8.dp)) { AvisoDeshacer(it) }
+            }
+        }
     }
 
     @Test fun inicio() = capturar("0-inicio") {

@@ -55,6 +55,7 @@ interface DaoTinta {
     @Query("SELECT * FROM variantes_bloque WHERE id = :id") suspend fun varianteBloque(id: String): VarianteBloqueE?
     @Query("SELECT * FROM variantes_bloque WHERE bloque_id = :bloque AND borrado = 0 ORDER BY creado") suspend fun variantesDe(bloque: String): List<VarianteBloqueE>
     @Query("SELECT * FROM publicaciones WHERE id = :id") suspend fun publicacion(id: String): PublicacionE?
+    @Query("SELECT * FROM publicaciones WHERE articulo_id = :articulo") suspend fun publicacionesDe(articulo: String): List<PublicacionE>
     @Query("SELECT * FROM publicaciones WHERE borrado = 0") suspend fun todasPublicaciones(): List<PublicacionE>
 
     // --- Cola.

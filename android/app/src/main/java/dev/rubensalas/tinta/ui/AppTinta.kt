@@ -15,6 +15,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,7 +26,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -48,7 +53,10 @@ import dev.rubensalas.tinta.ui.actualizacion.UpdateBanner
 import dev.rubensalas.tinta.ui.actualizacion.startUpdate
 import dev.rubensalas.tinta.ui.ajustes.PantallaAjustes
 import dev.rubensalas.tinta.ui.ajustes.PantallaInicio
+import dev.rubensalas.tinta.ui.articulos.AvisoDeshacer
+import dev.rubensalas.tinta.ui.articulos.DialogoEliminarArticulo
 import dev.rubensalas.tinta.ui.articulos.PantallaArticulos
+import dev.rubensalas.tinta.ui.articulos.ofrecerDeshacer
 import dev.rubensalas.tinta.ui.calendario.AccionesPublicacion
 import dev.rubensalas.tinta.ui.calendario.DialogoNuevaPublicacion
 import dev.rubensalas.tinta.ui.calendario.PantallaCalendario
@@ -173,6 +181,18 @@ fun AppTinta(c: Contenedor) {
     val ruta = nav.currentBackStackEntryAsState().value?.destination?.route
     val seccion = Seccion.entries.firstOrNull { it.name == ruta }
     var nuevaPublicacion by remember { mutableStateOf(false) }
+    var porEliminar by remember { mutableStateOf<String?>(null) }
+    val avisoAbajo = remember { SnackbarHostState() }
+
+    // Eliminar desde el editor vuelve a la lista. Deshacer encola restaurar.
+    fun eliminar(id: String) {
+        if (nav.currentBackStackEntry?.destination?.route == "editor/{id}") nav.popBackStack()
+        scope.launch {
+            repo.borrarArticulo(id)
+            avisoAbajo.currentSnackbarData?.dismiss()
+            if (avisoAbajo.ofrecerDeshacer()) repo.restaurarArticulo(id)
+        }
+    }
 
     fun nuevoArticulo() = scope.launch { nav.navigate("editor/${repo.crearArticulo("Sin título")}") }
 
@@ -189,7 +209,7 @@ fun AppTinta(c: Contenedor) {
                     )
                 }
                 composable(Seccion.Articulos.name) {
-                    PantallaArticulos(datos, hoy, onArticulo = { nav.navigate("editor/$it") }, onNuevo = { nuevoArticulo() })
+                    PantallaArticulos(datos, hoy, onArticulo = { nav.navigate("editor/$it") }, onNuevo = { nuevoArticulo() }, onEliminar = { porEliminar = it })
                 }
                 composable(Seccion.Calendario.name) {
                     PantallaCalendario(datos, hoy, onPublicacion = { nav.navigate("publicacion/$it") }, onNueva = { nuevaPublicacion = true })
@@ -227,7 +247,7 @@ fun AppTinta(c: Contenedor) {
                 }
                 composable("editor/{id}") { e ->
                     val id = e.arguments?.getString("id").orEmpty()
-                    PantallaEditor(datos, id, sinRed, accionesEditor, imagen, onVolver = { nav.popBackStack() }, onConflicto = { nav.navigate("conflicto/$it") })
+                    PantallaEditor(datos, id, sinRed, accionesEditor, imagen, onVolver = { nav.popBackStack() }, onConflicto = { nav.navigate("conflicto/$it") }, onEliminar = { porEliminar = id })
                 }
                 composable("conflicto/{bloque}") { e ->
                     val bid = e.arguments?.getString("bloque").orEmpty()
@@ -244,10 +264,14 @@ fun AppTinta(c: Contenedor) {
                     PantallaPublicacion(datos, id, accionesPublicacion(c, id, scope, ::copiar, ::elegirImagen, nav), imagen, onVolver = { nav.popBackStack() })
                 }
             }
+            SnackbarHost(avisoAbajo, Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 8.dp)) { AvisoDeshacer(it) }
         }
         if (seccion != null) BarraInferior(seccion) { s ->
             nav.navigate(s.name) { popUpTo(Seccion.Hoy.name); launchSingleTop = true }
         }
+    }
+    porEliminar?.let { id ->
+        DialogoEliminarArticulo(datos.titulo(id), onEliminar = { porEliminar = null; eliminar(id) }, onCancelar = { porEliminar = null })
     }
     if (nuevaPublicacion) DialogoNuevaPublicacion(datos.canales, hoy, { canal, formato, fecha ->
         nuevaPublicacion = false

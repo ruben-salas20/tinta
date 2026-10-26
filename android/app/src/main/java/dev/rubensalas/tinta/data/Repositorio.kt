@@ -81,6 +81,11 @@ class Repositorio(
     suspend fun cambiarEstado(articuloId: String, estado: String) =
         hacer(Op.cambiarArticulo(articuloId, buildJsonObject { put("estado", estado) }))
 
+    /** Lo quita en todos sus idiomas y ramas, con sus publicaciones sin publicar. */
+    suspend fun borrarArticulo(id: String) = hacer(Op.borrarArticulo(id))
+
+    suspend fun restaurarArticulo(id: String) = hacer(Op.restaurarArticulo(id))
+
     suspend fun cambiarTitulo(idiomaId: String, titulo: String) =
         hacer(Op.cambiarIdioma(idiomaId, buildJsonObject { put("titulo", titulo) }))
 

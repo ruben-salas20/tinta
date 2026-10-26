@@ -95,6 +95,7 @@ fun PantallaEditor(
     onVolver: () -> Unit,
     onConflicto: (String) -> Unit,
     focoInicial: String? = null,
+    onEliminar: () -> Unit = {},
 ) {
     val c = Tinta.colores
     val scope = rememberCoroutineScope()
@@ -190,6 +191,8 @@ fun PantallaEditor(
                                 scope.launch { acciones.borrarBloque(id) }
                             })
                         }
+                        HorizontalDivider()
+                        DropdownMenuItem({ Text("Eliminar artículo") }, { menu = false; enfocar(null); onEliminar() })
                     }
                 }
             }

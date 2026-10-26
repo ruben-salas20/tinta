@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,7 +112,13 @@ fun MarcaIa() {
 }
 
 @Composable
-fun Tarjeta(modifier: Modifier = Modifier, borde: Color = Tinta.colores.linea, onClick: (() -> Unit)? = null, contenido: @Composable ColumnScope.() -> Unit) {
+fun Tarjeta(
+    modifier: Modifier = Modifier,
+    borde: Color = Tinta.colores.linea,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    contenido: @Composable ColumnScope.() -> Unit,
+) {
     val c = Tinta.colores
     Column(
         modifier
@@ -119,7 +126,13 @@ fun Tarjeta(modifier: Modifier = Modifier, borde: Color = Tinta.colores.linea, o
             .clip(RoundedCornerShape(16.dp))
             .background(c.hoja)
             .border(1.dp, borde, RoundedCornerShape(16.dp))
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .let {
+                when {
+                    onLongClick != null -> it.combinedClickable(onLongClick = onLongClick, onClick = onClick ?: {})
+                    onClick != null -> it.clickable(onClick = onClick)
+                    else -> it
+                }
+            }
             .padding(14.dp),
         content = contenido,
     )

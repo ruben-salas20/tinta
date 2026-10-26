@@ -5,10 +5,12 @@ import dev.rubensalas.tinta.data.api.Cliente
 import dev.rubensalas.tinta.data.api.Servidor
 import dev.rubensalas.tinta.data.api.json
 import dev.rubensalas.tinta.data.local.BaseLocal
+import dev.rubensalas.tinta.data.sync.Op
 import dev.rubensalas.tinta.data.sync.Sincronizador
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -137,5 +139,60 @@ class SincronizacionTest {
         // Limpieza: borrar el artículo de prueba.
         val del = Request.Builder().url("$url/api/articulos/$aid").header("Authorization", "Bearer $clave").delete().build()
         OkHttpClient().newCall(del).execute().close()
+    }
+
+    /** La fila [id] de [tabla] tal como está en el servicio, lápidas incluidas. */
+    private suspend fun enServicio(tabla: String, id: String): JsonObject =
+        cliente.bajar(null).tablas[tabla]!!.map { it as JsonObject }.single { it["id"]!!.jsonPrimitive.content == id }
+
+    private fun JsonObject.borrado() = this["borrado"]!!.jsonPrimitive.content.toInt()
+
+    @Test fun eliminarArticuloSinRedYDeshacer() = runBlocking {
+        sync.sincronizar()
+        val aid = repo.crearArticulo("Para eliminar ${nuevoId().take(6)}")
+        val canal = dao.canales().first().first()
+        val formato = canal.formatos.first().id
+        val pendiente = repo.crearPublicacion(canal.id, formato, "2030-01-15", null, "Sin publicar", aid)
+        val hecha = repo.crearPublicacion(canal.id, formato, "2030-01-10", null, "Ya publicada", aid)
+        repo.marcarPublicada(hecha, "")
+        sync.sincronizar()
+        assertEquals(0, enServicio("articulos", aid).borrado())
+
+        // 1. Sin red: eliminar cambia la copia al momento y espera en la cola.
+        repo.borrarArticulo(aid)
+        assertEquals(1, dao.articulo(aid)!!.borrado)
+        assertEquals(1, dao.publicacion(pendiente)!!.borrado)
+        assertEquals(0, dao.publicacion(hecha)!!.borrado)
+        assertEquals(0, enServicio("articulos", aid).borrado())
+
+        // 2. Al subir, el servicio lo borra igual: la publicada se queda.
+        val r = sync.sincronizar()
+        assertEquals(0, r.pendientes)
+        assertEquals(0, r.descartadas)
+        assertEquals(1, enServicio("articulos", aid).borrado())
+        assertEquals(1, enServicio("publicaciones", pendiente).borrado())
+        assertEquals(0, enServicio("publicaciones", hecha).borrado())
+        assertEquals(1, dao.articulo(aid)!!.borrado)
+
+        // 3. Deshacer: vuelve todo, en el móvil y en el servicio.
+        repo.restaurarArticulo(aid)
+        assertEquals(0, dao.articulo(aid)!!.borrado)
+        assertEquals(0, dao.publicacion(pendiente)!!.borrado)
+        sync.sincronizar()
+        assertEquals(0, enServicio("articulos", aid).borrado())
+        assertEquals(0, enServicio("publicaciones", pendiente).borrado())
+        assertEquals(0, dao.articulo(aid)!!.borrado)
+        assertEquals(0, dao.publicacion(pendiente)!!.borrado)
+
+        // 4. Reintentar las dos operaciones es seguro.
+        for (op in listOf(Op.restaurarArticulo(aid), Op.borrarArticulo(aid), Op.borrarArticulo(aid))) {
+            val res = cliente.subir(listOf(op))
+            assertTrue("reintentar $op debe salir bien: ${res.resultados}", res.resultados.single()["ok"].toString() == "true")
+        }
+        assertEquals(1, enServicio("articulos", aid).borrado())
+
+        // Limpieza: la publicada no se va con el artículo.
+        cliente.subir(listOf(Op.borrarPublicacion(hecha)))
+        Unit
     }
 }

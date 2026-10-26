@@ -1025,6 +1025,108 @@ pub fn fork_seccion(c: &mut Connection, seccion_id: &str, f: ForkSeccion) -> Res
     Ok((documento(c, &rama)?, nueva))
 }
 
+/// Un bloque escrito de una vez, para las propuestas del agente.
+#[derive(Debug, Deserialize, Clone)]
+pub struct BloqueEscrito {
+    #[serde(default = "parrafo")]
+    pub tipo: String,
+    pub contenido: String,
+}
+
+/// Una sección escrita de una vez: su título (vacío en la de entrada) y bloques.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SeccionEscrita {
+    #[serde(default)]
+    pub titulo: String,
+    pub bloques: Vec<BloqueEscrito>,
+}
+
+fn validar_bloques(bloques: &[BloqueEscrito]) -> Res<()> {
+    if bloques.is_empty() {
+        return Err(Error::Invalido("hace falta al menos un bloque".into()));
+    }
+    if let Some(b) = bloques.iter().find(|b| !TIPOS.contains(&b.tipo.as_str())) {
+        return Err(Error::Invalido(format!("tipo de bloque desconocido: {}", b.tipo)));
+    }
+    Ok(())
+}
+
+fn insertar_bloques(c: &Connection, vs_id: &str, bloques: &[BloqueEscrito], origen: &str, rev: i64) -> Res<()> {
+    for (b, pos) in bloques.iter().zip(posicion::serie(bloques.len())) {
+        insertar_bloque(c, vs_id, &pos, &b.tipo, &b.contenido, origen, rev)?;
+    }
+    Ok(())
+}
+
+/// Variante nueva de una sección con bloques ya escritos. No se activa.
+pub fn crear_variante_seccion(c: &mut Connection, seccion_id: &str, titulo: &str, bloques: &[BloqueEscrito], origen: &str) -> Res<(Documento, String)> {
+    validar_bloques(bloques)?;
+    let tx = c.transaction()?;
+    let rama = rama_de(&tx, "secciones", seccion_id)?;
+    if !existe(&tx, "secciones", seccion_id)? {
+        return Err(Error::NoExiste("sección"));
+    }
+    let rev = siguiente_rev(&tx)?;
+    let vs = insertar_variante_seccion(&tx, seccion_id, titulo.trim(), origen, rev)?;
+    insertar_bloques(&tx, &vs, bloques, origen, rev)?;
+    let aid = articulo_de(&tx, "secciones", seccion_id)?;
+    tocar_articulo(&tx, &aid, rev)?;
+    tx.commit()?;
+    Ok((documento(c, &rama)?, vs))
+}
+
+/// Un idioma nuevo con todo su contenido, en borrador. Lo usa la traducción
+/// que propone un agente: queda marcada `traducido_ia`.
+pub fn crear_idioma_escrito(
+    c: &mut Connection,
+    articulo_id: &str,
+    idioma: &str,
+    titulo: &str,
+    descripcion: &str,
+    secciones: &[SeccionEscrita],
+    origen: &str,
+) -> Res<Articulo> {
+    if !IDIOMAS.contains(&idioma) {
+        return Err(Error::Invalido(format!("idioma desconocido: {idioma}")));
+    }
+    if secciones.is_empty() {
+        return Err(Error::Invalido("hace falta al menos una sección".into()));
+    }
+    for s in secciones {
+        validar_bloques(&s.bloques)?;
+    }
+    let tx = c.transaction()?;
+    if !existe(&tx, "articulos", articulo_id)? {
+        return Err(Error::NoExiste("artículo"));
+    }
+    let ya = tx
+        .query_row("SELECT 1 FROM idiomas WHERE articulo_id = ?1 AND idioma = ?2 AND borrado = 0", params![articulo_id, idioma], |_| Ok(()))
+        .optional()?
+        .is_some();
+    if ya {
+        return Err(Error::Invalido(format!("el artículo ya tiene versión «{idioma}»: propón variantes de sus secciones")));
+    }
+    let rev = siguiente_rev(&tx)?;
+    let iid = nuevo_id();
+    tx.execute(
+        "INSERT INTO idiomas (id, articulo_id, idioma, titulo, descripcion, borrador, traducido_ia, rev) VALUES (?1, ?2, ?3, ?4, ?5, 1, 1, ?6)",
+        params![iid, articulo_id, idioma, titulo.trim(), descripcion.trim(), rev],
+    )?;
+    let rid = nuevo_id();
+    tx.execute("INSERT INTO ramas (id, idioma_id, nombre, creado, rev) VALUES (?1, ?2, 'principal', ?3, ?4)", params![rid, iid, ahora(), rev])?;
+    tx.execute("UPDATE idiomas SET rama_principal_id = ?2 WHERE id = ?1", params![iid, rid])?;
+    for (s, pos) in secciones.iter().zip(posicion::serie(secciones.len())) {
+        let sid = nuevo_id();
+        tx.execute("INSERT INTO secciones (id, rama_id, posicion, rev) VALUES (?1, ?2, ?3, ?4)", params![sid, rid, pos, rev])?;
+        let vs = insertar_variante_seccion(&tx, &sid, s.titulo.trim(), origen, rev)?;
+        tx.execute("UPDATE secciones SET variante_activa_id = ?2 WHERE id = ?1", params![sid, vs])?;
+        insertar_bloques(&tx, &vs, &s.bloques, origen, rev)?;
+    }
+    tocar_articulo(&tx, articulo_id, rev)?;
+    tx.commit()?;
+    articulo(c, articulo_id)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CambioVarianteSeccion {
     pub titulo: Option<String>,
@@ -1555,5 +1657,31 @@ mod pruebas {
         guardar_variante_bloque(&mut c, &v.id, "El {~~ttl dice~>campo ttl marca~~}{>>ia:claude<<} algo", v.rev, "web").unwrap();
         let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
         assert_eq!(g.variante.contenido, "El campo ttl marca algo");
+    }
+
+    #[test]
+    fn escritos_de_una_vez() {
+        let mut c = en_memoria();
+        let (a, d) = nuevo(&mut c);
+        let sid = d.secciones[0].id.clone();
+        let bloques = vec![
+            BloqueEscrito { tipo: "parrafo".into(), contenido: "uno".into() },
+            BloqueEscrito { tipo: "codigo".into(), contenido: "```\nx\n```".into() },
+        ];
+        let (d, vs) = crear_variante_seccion(&mut c, &sid, "Otra idea", &bloques, "ia:claude").unwrap();
+        let s = &d.secciones[0];
+        assert_ne!(s.variante_activa_id.as_ref(), Some(&vs));
+        let v = s.variantes.iter().find(|v| v.id == vs).unwrap();
+        assert_eq!((v.origen.as_str(), v.bloques.len(), v.bloques[1].tipo.as_str()), ("ia:claude", 2, "codigo"));
+        assert!(crear_variante_seccion(&mut c, &sid, "", &[], "ia:c").is_err());
+
+        let secs = vec![SeccionEscrita { titulo: String::new(), bloques: bloques.clone() }, SeccionEscrita { titulo: "Setup".into(), bloques }];
+        let a = crear_idioma_escrito(&mut c, &a.id, "en", "Why llama-swap?", "One container", &secs, "ia:claude").unwrap();
+        let en = a.idiomas.iter().find(|i| i.resumen.idioma == "en").unwrap();
+        assert!(en.resumen.traducido_ia && en.resumen.borrador);
+        let den = documento(&c, en.resumen.rama_principal_id.as_ref().unwrap()).unwrap();
+        assert_eq!(den.secciones.len(), 2);
+        assert_eq!(den.secciones[1].variantes[0].titulo, "Setup");
+        assert!(crear_idioma_escrito(&mut c, &a.id, "en", "x", "", &secs, "ia:c").is_err());
     }
 }

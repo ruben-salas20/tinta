@@ -136,6 +136,34 @@ Las fechas van en `AAAA-MM-DD` y las horas en `HH:MM`, en la hora local de Rubé
 - **El portfolio manda en la fecha del artículo.** Crear o mover una publicación del canal `portfolio` que sale de un artículo cambia su `fecha`, que es la `date` del `.md` exportado.
 - `Articulo` trae `proxima: {canal_id, fecha, hora} | null`: la siguiente publicación sin publicar desde hoy.
 
+## MCP para agentes
+
+`POST /mcp` habla el protocolo MCP por HTTP (Streamable HTTP, sin flujo SSE): cada petición lleva un mensaje JSON-RPC y recibe la respuesta en JSON. Una notificación recibe un 202 vacío.
+
+- **Acceso:** `Authorization: Bearer <TINTA_MCP_KEY>`. Es una clave aparte: la de la app y la cookie de la web no abren el MCP, y la del MCP no abre `/api`. Sin `TINTA_MCP_KEY`, `/mcp` responde 404.
+- **Nombre del agente:** `?agente=<nombre>` en la dirección. Firma todo lo que hace como `ia:<nombre>`. Sin él, `ia:agente`.
+- **Versiones del protocolo:** 2025-11-25, 2025-06-18 y 2025-03-26.
+
+| Herramienta | Qué hace |
+|---|---|
+| `listar_articulos` | Títulos, ids, estado, serie, etiquetas, idiomas y lo pendiente |
+| `leer_articulo` | Un idioma por secciones y bloques, con sus marcas y sus ids |
+| `proponer_cambio` | Marca un trozo exacto de un bloque: cambiar, quitar o añadir detrás |
+| `proponer_variante_bloque` | Otra redacción de un bloque, sin activarla |
+| `proponer_variante_seccion` | Otra versión de una sección entera, sin activarla |
+| `comentar` | Una nota al margen, anclada a un trozo o al final del bloque |
+| `proponer_traduccion` | Crea el otro idioma en borrador, marcado `translatedWithAI`. Solo si aún no existe |
+| `leer_calendario` | Canales activos y publicaciones entre dos fechas (por defecto, 30 días desde hoy) |
+| `crear_publicacion` | Crea una publicación |
+| `cambiar_publicacion` | Mueve de fecha u hora, o cambia estado, texto, título, canal, formato o artículo |
+| `borrar_publicacion` | Borra una publicación (deja lápida) |
+
+**Dos reglas distintas a propósito:**
+- **En los artículos, el agente solo propone.** No hay herramientas para borrar, aceptar ni activar: eso lo hace Rubén.
+- **En el calendario, el agente actúa.** Crea, mueve, edita y borra publicaciones (decisión de Rubén, 2026-10-26).
+
+Desde `/api` nadie puede firmar como agente: el servicio ignora el `origen` que mande el cliente.
+
 ## Lo que falta para Android (fase 4)
 
 Cada tabla ya lleva `rev` y lápidas (`borrado`), y el contador global está en `meta.rev`. Falta la ruta de sincronización: «dame lo que cambió desde la rev N» y «aquí va mi cola de cambios». Se diseña en la fase 4.

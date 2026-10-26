@@ -29,6 +29,8 @@ pub struct Estado {
     pub medios: PathBuf,
     pub clave_api: String,
     pub clave_web: String,
+    /// Sin clave, `/mcp` no existe.
+    pub clave_mcp: Option<String>,
     pub cookie_segura: bool,
 }
 
@@ -281,7 +283,10 @@ async fn borrar_seccion(State(e): State<Estado>, Path(id): Path<String>) -> R<Js
     Ok(Json(e.con(|c| modelo::borrar_seccion(c, &id))?))
 }
 
-async fn fork_seccion(State(e): State<Estado>, Path(id): Path<String>, Json(b): Json<modelo::ForkSeccion>) -> R<Json<Value>> {
+// Desde la API, todo lo crea Rubén: solo el MCP firma como agente, y un
+// conflicto solo lo crea el servidor.
+async fn fork_seccion(State(e): State<Estado>, Path(id): Path<String>, Json(mut b): Json<modelo::ForkSeccion>) -> R<Json<Value>> {
+    b.origen = "tu".into();
     let (doc, nueva) = e.con(|c| modelo::fork_seccion(c, &id, b))?;
     Ok(Json(json!({ "documento": doc, "variante_id": nueva })))
 }
@@ -311,7 +316,8 @@ async fn borrar_bloque(State(e): State<Estado>, Path(id): Path<String>) -> R<Jso
     Ok(Json(e.con(|c| modelo::borrar_bloque(c, &id))?))
 }
 
-async fn fork_bloque(State(e): State<Estado>, Path(id): Path<String>, Json(b): Json<modelo::ForkBloque>) -> R<Json<Value>> {
+async fn fork_bloque(State(e): State<Estado>, Path(id): Path<String>, Json(mut b): Json<modelo::ForkBloque>) -> R<Json<Value>> {
+    b.origen = "tu".into();
     let (doc, nueva) = e.con(|c| modelo::fork_bloque(c, &id, b))?;
     Ok(Json(json!({ "documento": doc, "variante_id": nueva })))
 }
@@ -448,7 +454,8 @@ async fn publicaciones(State(e): State<Estado>, Query(f): Query<calendario::Filt
     Ok(Json(e.con(|c| calendario::listar_publicaciones(c, &f))?))
 }
 
-async fn crear_publicacion(State(e): State<Estado>, Json(b): Json<calendario::NuevaPublicacion>) -> R<(StatusCode, Json<calendario::Publicacion>)> {
+async fn crear_publicacion(State(e): State<Estado>, Json(mut b): Json<calendario::NuevaPublicacion>) -> R<(StatusCode, Json<calendario::Publicacion>)> {
+    b.origen = "tu".into();
     Ok((StatusCode::CREATED, Json(e.con(|c| calendario::crear_publicacion(c, b))?)))
 }
 
@@ -471,6 +478,38 @@ async fn difusion(State(e): State<Estado>, Path(id): Path<String>, Json(b): Json
 
 async fn hoy() -> Json<Value> {
     Json(json!({ "fecha": calendario::hoy(), "zona": calendario::zona().name() }))
+}
+
+#[derive(Deserialize)]
+struct QueAgente {
+    agente: Option<String>,
+}
+
+/// `POST /mcp`: un mensaje JSON-RPC. Responde en JSON; una notificación, 202.
+async fn mcp(State(e): State<Estado>, Query(q): Query<QueAgente>, h: HeaderMap, cuerpo: axum::body::Bytes) -> Response {
+    let Some(clave) = &e.clave_mcp else { return StatusCode::NOT_FOUND.into_response() };
+    let ok = h
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .is_some_and(|k| iguales(k, clave));
+    if !ok {
+        return ErrorApi(StatusCode::UNAUTHORIZED, "hace falta la clave del MCP".into()).into_response();
+    }
+    let agente: String = q.agente.unwrap_or_else(|| "agente".into()).chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').take(32).collect();
+    let agente = if agente.is_empty() { "agente".to_string() } else { agente };
+    let msg: Value = match serde_json::from_slice(&cuerpo) {
+        Ok(v) => v,
+        Err(_) => {
+            return Json(json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "JSON no válido" } })).into_response();
+        }
+    };
+    let r = e.con(|c| Ok(crate::mcp::atender(c, &agente, &msg)));
+    match r {
+        Ok(Some(v)) => Json(v).into_response(),
+        Ok(None) => StatusCode::ACCEPTED.into_response(),
+        Err(err) => err.into_response(),
+    }
 }
 
 pub fn rutas(e: Estado) -> Router {
@@ -514,6 +553,8 @@ pub fn rutas(e: Estado) -> Router {
         .route("/salir", post(salir));
     Router::new()
         .route("/health", get(|| async { "ok" }))
+        // Sin flujo SSE: GET no se usa (el protocolo pide 405).
+        .route("/mcp", post(mcp).get(|| async { StatusCode::METHOD_NOT_ALLOWED }))
         .nest("/api", api)
         .with_state(e)
 }
@@ -537,6 +578,7 @@ mod pruebas {
             medios: dir.path().join("medios"),
             clave_api: "clave-app".into(),
             clave_web: "secreta".into(),
+            clave_mcp: Some("clave-mcp".into()),
             cookie_segura: true,
         };
         (rutas(e.clone()), e, dir)
@@ -617,5 +659,27 @@ mod pruebas {
         assert_eq!(res.headers()["content-type"], "audio/mpeg");
         assert!(res.headers()["cache-control"].to_str().unwrap().contains("immutable"));
         assert_eq!(res.into_body().collect().await.unwrap().to_bytes().as_ref(), b"234");
+    }
+
+    #[tokio::test]
+    async fn mcp_por_http() {
+        let (app, _d) = app();
+        let init = json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} });
+        assert_eq!(pedir(&app, "POST", "/mcp", Some(init.clone()), None).await.0, StatusCode::UNAUTHORIZED);
+        // Ni la clave de la app ni la cookie de la web abren el MCP.
+        assert_eq!(pedir(&app, "POST", "/mcp", Some(init.clone()), Some("Bearer clave-app")).await.0, StatusCode::UNAUTHORIZED);
+        let (s, _, b) = pedir(&app, "POST", "/mcp?agente=claude", Some(init), Some("Bearer clave-mcp")).await;
+        assert_eq!(s, StatusCode::OK);
+        let v: Value = serde_json::from_slice(&b).unwrap();
+        assert_eq!(v["result"]["serverInfo"]["name"], "tinta");
+        let n = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+        assert_eq!(pedir(&app, "POST", "/mcp", Some(n), Some("Bearer clave-mcp")).await.0, StatusCode::ACCEPTED);
+        // Y la clave del MCP no abre la API.
+        assert_eq!(pedir(&app, "GET", "/api/articulos", None, Some("Bearer clave-mcp")).await.0, StatusCode::UNAUTHORIZED);
+        // Desde la API no se puede firmar como agente.
+        let k = Some("Bearer clave-app");
+        let (_, _, b) = pedir(&app, "POST", "/api/publicaciones", Some(json!({ "canal_id": "x", "formato": "post", "fecha": "2026-11-01", "origen": "ia:falso" })), k).await;
+        let p: Value = serde_json::from_slice(&b).unwrap();
+        assert_eq!(p["origen"], "tu");
     }
 }

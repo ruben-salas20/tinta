@@ -146,9 +146,11 @@ Tinta expone un MCP en `https://tinta.rubensalas.dev/mcp`, con su propia clave. 
 | `proponer_variante` | Crea una variante nueva de una sección o de un párrafo, sin activarla |
 | `comentar` | Añade una nota al margen |
 | `proponer_traduccion` | Crea la versión en inglés como borrador marcado `translatedWithAI` |
-| `leer_calendario` y `proponer_publicacion` | Consulta el calendario y sugiere publicaciones en estado idea |
+| `leer_calendario` | Consulta los canales y las publicaciones |
 
-**No hay herramientas para borrar, aceptar ni activar.** Eso solo lo haces tú. Cada propuesta lleva el nombre del agente que la hizo.
+**En los artículos no hay herramientas para borrar, aceptar ni activar.** Eso solo lo haces tú. Cada propuesta lleva el nombre del agente que la hizo.
+
+**En el calendario, el agente actúa directamente** (decidido el 2026-10-26, durante la fase 3). Crea, mueve, edita y borra publicaciones con `crear_publicacion`, `cambiar_publicacion` y `borrar_publicacion`. Lo que cambia queda firmado con su nombre.
 
 ## 8. Seguridad
 

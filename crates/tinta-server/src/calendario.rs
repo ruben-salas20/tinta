@@ -348,6 +348,12 @@ mod doble {
 }
 
 pub fn actualizar_publicacion(c: &mut Connection, id: &str, cambio: CambioPublicacion) -> Res<Publicacion> {
+    actualizar_publicacion_como(c, id, cambio, "tu")
+}
+
+/// Como [`actualizar_publicacion`], pero dejando como autor `origen`: el MCP
+/// firma así lo que cambia un agente.
+pub fn actualizar_publicacion_como(c: &mut Connection, id: &str, cambio: CambioPublicacion, origen: &str) -> Res<Publicacion> {
     let tx = c.transaction()?;
     let p = publicacion(&tx, id)?;
     let canal_id = cambio.canal_id.unwrap_or(p.canal_id);
@@ -372,8 +378,8 @@ pub fn actualizar_publicacion(c: &mut Connection, id: &str, cambio: CambioPublic
     let rev = siguiente_rev(&tx)?;
     tx.execute(
         "UPDATE publicaciones SET canal_id = ?2, formato = ?3, fecha = ?4, hora = ?5, estado = ?6, titulo = ?7,
-           partes = ?8, articulo_id = ?9, enlace = ?10, origen = 'tu', cambiado = ?11, rev = ?12 WHERE id = ?1",
-        params![id, canal_id, formato, fecha, hora, estado, titulo, serde_json::to_string(&partes).unwrap(), articulo_id, enlace, ahora(), rev],
+           partes = ?8, articulo_id = ?9, enlace = ?10, origen = ?13, cambiado = ?11, rev = ?12 WHERE id = ?1",
+        params![id, canal_id, formato, fecha, hora, estado, titulo, serde_json::to_string(&partes).unwrap(), articulo_id, enlace, ahora(), rev, origen],
     )?;
     sincronizar_fecha_articulo(&tx, id, rev)?;
     tx.commit()?;

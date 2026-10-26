@@ -5,6 +5,7 @@ mod calendario;
 mod critic;
 mod db;
 mod exportar;
+mod mcp;
 mod modelo;
 mod posicion;
 
@@ -38,6 +39,7 @@ async fn main() {
         medios: datos.join("medios"),
         clave_api: variable("TINTA_API_KEY"),
         clave_web: variable("TINTA_WEB_PASSWORD"),
+        clave_mcp: std::env::var("TINTA_MCP_KEY").ok().filter(|k| !k.trim().is_empty()),
         // Solo para probar en local sin HTTPS.
         cookie_segura: std::env::var("TINTA_COOKIE_INSEGURA").is_err(),
     };

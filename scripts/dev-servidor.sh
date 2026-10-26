@@ -4,7 +4,7 @@
 # 127.0.0.1; pon la IP de Tailscale para abrirlo desde otro equipo).
 #   scripts/dev-servidor.sh          compila y (re)arranca
 #   scripts/dev-servidor.sh parar    lo para
-# Claves de desarrollo: web «tinta», app «dev-clave». Sin HTTPS, por eso la
+# Claves de desarrollo: web «tinta», app «dev-clave», MCP «dev-mcp». Sin HTTPS, por eso la
 # cookie va sin Secure (TINTA_COOKIE_INSEGURA).
 set -euo pipefail
 raiz=$(cd "$(dirname "$0")/.." && pwd)
@@ -18,6 +18,7 @@ docker run -d --name tinta-dev \
   -p "$ip:8091:8080" \
   -e TINTA_API_KEY=dev-clave -e TINTA_WEB_PASSWORD=tinta -e TINTA_COOKIE_INSEGURA=1 \
   -e TINTA_ZONA=America/Bogota \
+  -e TINTA_MCP_KEY=dev-mcp \
   -e RUST_LOG=tinta_server=debug \
   -v "$raiz/target/debug/tinta-server:/usr/local/bin/tinta-server:ro" \
   -v "$raiz/datos-dev:/data" \

@@ -195,6 +195,62 @@ pub fn resolver(s: &str, indice: usize, decision: Decision) -> Option<String> {
     Some(escribir(&trozos))
 }
 
+/// Qué propone un agente sobre un trozo de texto que ya existe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Propuesta {
+    Cambiar(String),
+    Quitar,
+    /// Añadir este texto justo después.
+    Anadir(String),
+}
+
+/// Marca la primera aparición de `buscar` como propuesta del agente `ia`.
+/// Solo busca en el texto sin marcas: no se propone sobre otra propuesta.
+/// Devuelve `None` si no lo encuentra.
+pub fn proponer(s: &str, buscar: &str, p: Propuesta, ia: &str) -> Option<String> {
+    if buscar.is_empty() {
+        return None;
+    }
+    let mut trozos = leer(s);
+    let pos = trozos.iter().position(|t| matches!(t, Trozo::Texto(x) if x.contains(buscar)))?;
+    let Trozo::Texto(x) = trozos[pos].clone() else { unreachable!() };
+    let i = x.find(buscar).unwrap();
+    let (antes, despues) = (&x[..i], &x[i + buscar.len()..]);
+    let ia = Some(ia.to_string());
+    let mut nuevos = vec![Trozo::Texto(antes.into())];
+    match p {
+        Propuesta::Cambiar(nuevo) => nuevos.push(Trozo::Cambio { antes: buscar.into(), despues: nuevo, ia }),
+        Propuesta::Quitar => nuevos.push(Trozo::Borrado { texto: buscar.into(), ia }),
+        Propuesta::Anadir(nuevo) => {
+            nuevos.push(Trozo::Texto(buscar.into()));
+            nuevos.push(Trozo::Anadido { texto: nuevo, ia });
+        }
+    }
+    nuevos.push(Trozo::Texto(despues.into()));
+    trozos.splice(pos..=pos, nuevos.into_iter().filter(|t| !matches!(t, Trozo::Texto(x) if x.is_empty())));
+    Some(escribir(&trozos))
+}
+
+/// Nota del agente anclada a `ancla`, o al final del texto si no se da.
+pub fn anotar(s: &str, nota: &str, ancla: Option<&str>, ia: &str) -> Option<String> {
+    let marca = format!("{{>>ia:{ia}: {}<<}}", nota.replace("<<}", "<< }"));
+    let Some(ancla) = ancla.filter(|a| !a.is_empty()) else {
+        return Some(format!("{}{}{marca}", s.trim_end(), if s.trim().is_empty() { "" } else { " " }));
+    };
+    let mut trozos = leer(s);
+    let pos = trozos.iter().position(|t| matches!(t, Trozo::Texto(x) if x.contains(ancla)))?;
+    let Trozo::Texto(x) = trozos[pos].clone() else { unreachable!() };
+    let i = x.find(ancla).unwrap();
+    let nuevos = [
+        Trozo::Texto(x[..i].into()),
+        Trozo::Resaltado(ancla.into()),
+        Trozo::Nota { texto: nota.into(), ia: Some(ia.into()) },
+        Trozo::Texto(x[i + ancla.len()..].into()),
+    ];
+    trozos.splice(pos..=pos, nuevos.into_iter().filter(|t| !matches!(t, Trozo::Texto(x) if x.is_empty())));
+    Some(escribir(&trozos))
+}
+
 #[cfg(test)]
 mod pruebas {
     use super::*;
@@ -241,5 +297,27 @@ mod pruebas {
     fn llaves_sueltas_son_texto() {
         assert_eq!(leer("a {-- b"), vec![Trozo::Texto("a {-- b".into())]);
         assert_eq!(limpio("código {x}"), "código {x}");
+    }
+
+    #[test]
+    fn proponer_y_anotar() {
+        let base = "El ttl dice cuánto {--muy--} dura.";
+        assert_eq!(
+            proponer(base, "El ttl dice", Propuesta::Cambiar("El campo ttl marca".into()), "claude").unwrap(),
+            "{~~El ttl dice~>El campo ttl marca~~}{>>ia:claude<<} cuánto {--muy--} dura."
+        );
+        assert_eq!(proponer(base, " dura", Propuesta::Quitar, "c").unwrap(), "El ttl dice cuánto {--muy--}{-- dura--}{>>ia:c<<}.");
+        assert_eq!(proponer(base, "cuánto", Propuesta::Anadir(" tiempo".into()), "c").unwrap(), "El ttl dice cuánto{++ tiempo++}{>>ia:c<<} {--muy--} dura.");
+        // No propone sobre lo que ya está marcado, ni sobre lo que no existe.
+        assert!(proponer(base, "muy", Propuesta::Quitar, "c").is_none());
+        assert!(proponer(base, "nada", Propuesta::Quitar, "c").is_none());
+        let r = proponer(base, "ttl", Propuesta::Quitar, "c").unwrap();
+        assert_eq!(limpio_prosa(&r), "El ttl dice cuánto dura.");
+
+        assert_eq!(anotar("Hola mundo", "¿Seguro?", Some("mundo"), "claude").unwrap(), "Hola {==mundo==}{>>ia:claude: ¿Seguro?<<}");
+        assert_eq!(anotar("Hola", "fin", None, "c").unwrap(), "Hola {>>ia:c: fin<<}");
+        let t = leer(&anotar("Hola mundo", "x", Some("mundo"), "c").unwrap());
+        assert!(matches!(&t[2], Trozo::Nota { ia: Some(n), .. } if n == "c"));
+        assert!(anotar("Hola", "x", Some("adiós"), "c").is_none());
     }
 }

@@ -8,6 +8,7 @@ mod exportar;
 mod mcp;
 mod modelo;
 mod posicion;
+mod sync;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

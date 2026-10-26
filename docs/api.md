@@ -164,6 +164,35 @@ Las fechas van en `AAAA-MM-DD` y las horas en `HH:MM`, en la hora local de Rubé
 
 Desde `/api` nadie puede firmar como agente: el servicio ignora el `origen` que mande el cliente.
 
-## Lo que falta para Android (fase 4)
+## Sincronización (app de Android)
 
-Cada tabla ya lleva `rev` y lápidas (`borrado`), y el contador global está en `meta.rev`. Falta la ruta de sincronización: «dame lo que cambió desde la rev N» y «aquí va mi cola de cambios». Se diseña en la fase 4.
+La app trabaja sin conexión: guarda una copia y una cola de cambios. La lógica está en `crates/tinta-server/src/sync.rs`.
+
+| Método y ruta | Cuerpo | Devuelve |
+|---|---|---|
+| `GET /api/sync?desde=N` | | `{rev, tablas: {series, etiquetas, articulos, idiomas, ramas, secciones, variantes_seccion, bloques, variantes_bloque, medios, canales, publicaciones}}`. Cada tabla trae sus filas con `rev > N`, lápidas incluidas (`borrado: 1`). Sin `desde`, todo. `articulos` trae además `etiquetas` (ids) |
+| `POST /api/sync` | `{operaciones: [Op]}`, con `X-Tinta-Dispositivo: android` | `{resultados: [{ok, error?, reintentar?, …}], rev}`, uno por operación y en orden |
+
+**Operaciones** (campo `op`):
+
+| `op` | Campos |
+|---|---|
+| `guardar` | `variante_bloque_id, contenido, rev_base`. Devuelve `conflicto`, `variante_id` y `rev` |
+| `crear_articulo` | `titulo, ids: {articulo, idioma, rama, seccion, variante_seccion, bloque, variante_bloque}` |
+| `cambiar_articulo` / `cambiar_idioma` | `id, cambio` (los mismos campos que el `PATCH`) |
+| `crear_seccion` | `rama_id, titulo, antes?, despues?, ids: {seccion, variante_seccion, bloque, variante_bloque}` |
+| `cambiar_seccion` / `borrar_seccion` | `id, cambio?` |
+| `cambiar_variante_seccion` | `id, titulo` |
+| `crear_bloque` | `variante_seccion_id, tipo, contenido, antes?, despues?, ids: {bloque, variante_bloque}` |
+| `cambiar_bloque` / `borrar_bloque` | `id, cambio?` |
+| `fork_bloque` | `bloque_id, contenido?, activar, ids: {variante_bloque}` |
+| `borrar_variante_bloque` | `id` |
+| `resolver_marca` | `variante_bloque_id, indice, decision` |
+| `crear_publicacion` | `publicacion` (como el `POST`), `ids: {publicacion}` |
+| `cambiar_publicacion` / `borrar_publicacion` | `id, cambio?` |
+
+**Reintentar es seguro.** Los ids los elige el móvil (24 caracteres hexadecimales en minúscula), así que una creación repetida responde `repetida: true` sin duplicar. Borrar lo que ya no existe no es un error. Guardar texto sobre una `rev_base` vieja crea una variante «conflicto» y no pisa nada. Lo demás gana el último en llegar.
+
+**Qué hacer con cada resultado:** `ok: true`, quitarla de la cola. `ok: false` con `reintentar`, dejarla para la próxima vez. `ok: false` sin `reintentar`, son datos no válidos: descartarla y avisar.
+
+**Medios sin conexión:** `POST /api/medios` acepta un campo `id` antes de `archivo`. Si ese id ya existe, devuelve el medio sin volver a guardarlo.

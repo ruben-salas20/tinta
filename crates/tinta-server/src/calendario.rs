@@ -300,7 +300,7 @@ fn insertar(c: &Connection, n: NuevaPublicacion) -> Res<String> {
         return Err(Error::NoExiste("artículo"));
     }
     let rev = siguiente_rev(c)?;
-    let id = nuevo_id();
+    let id = crate::modelo::id_para(|d| &mut d.publicacion);
     let t = ahora();
     c.execute(
         "INSERT INTO publicaciones (id, canal_id, formato, fecha, hora, estado, titulo, partes, articulo_id, origen, creado, cambiado, rev)

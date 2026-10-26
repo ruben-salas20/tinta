@@ -392,7 +392,20 @@ fn tipo_permitido(t: &str) -> bool {
 
 async fn subir_medio(State(e): State<Estado>, mut m: Multipart) -> R<(StatusCode, Json<modelo::Medio>)> {
     let mal = |s: &str| ErrorApi(StatusCode::BAD_REQUEST, s.to_string());
+    // El móvil, que sube sin conexión más tarde, manda antes el id que eligió.
+    let mut id_dado: Option<String> = None;
     while let Some(mut campo) = m.next_field().await.map_err(|e| mal(&e.to_string()))? {
+        if campo.name() == Some("id") {
+            let id = campo.text().await.map_err(|e| mal(&e.to_string()))?;
+            if !modelo::id_valido(&id) {
+                return Err(mal("id no válido"));
+            }
+            if let Ok(ya) = e.con(|c| modelo::medio(c, &id)) {
+                return Ok((StatusCode::OK, Json(ya)));
+            }
+            id_dado = Some(id);
+            continue;
+        }
         if campo.name() != Some("archivo") {
             continue;
         }
@@ -414,7 +427,8 @@ async fn subir_medio(State(e): State<Estado>, mut m: Multipart) -> R<(StatusCode
         f.flush().await.map_err(|e| mal(&e.to_string()))?;
         let suma = hex::encode(h.finalize());
         tokio::fs::rename(&temporal, e.medios.join(&suma)).await.map_err(|e| mal(&e.to_string()))?;
-        let medio = e.con(|c| modelo::registrar_medio(c, &suma, &nombre, &tipo, tamano))?;
+        let ids = modelo::IdsDados { medio: id_dado, ..Default::default() };
+        let medio = e.con(|c| modelo::con_ids(ids, || modelo::registrar_medio(c, &suma, &nombre, &tipo, tamano)))?;
         return Ok((StatusCode::CREATED, Json(medio)));
     }
     Err(mal("falta el campo «archivo»"))
@@ -512,6 +526,24 @@ async fn mcp(State(e): State<Estado>, Query(q): Query<QueAgente>, h: HeaderMap, 
     }
 }
 
+#[derive(Deserialize)]
+struct Desde {
+    desde: Option<i64>,
+}
+
+async fn sync_bajar(State(e): State<Estado>, Query(q): Query<Desde>) -> R<Json<Value>> {
+    Ok(Json(e.con(|c| crate::sync::bajar(c, q.desde.unwrap_or(-1)))?))
+}
+
+#[derive(Deserialize)]
+struct Cola {
+    operaciones: Vec<Value>,
+}
+
+async fn sync_subir(State(e): State<Estado>, d: Dispositivo, Json(b): Json<Cola>) -> R<Json<Value>> {
+    Ok(Json(e.con(|c| Ok(crate::sync::subir(c, b.operaciones, &d.0)))?))
+}
+
 pub fn rutas(e: Estado) -> Router {
     let api = Router::new()
         .route("/sesion", get(yo))
@@ -542,6 +574,7 @@ pub fn rutas(e: Estado) -> Router {
         .route("/medios", post(subir_medio).layer(DefaultBodyLimit::max(300 * 1024 * 1024)))
         .route("/medios/{id}", get(medio))
         .route("/hoy", get(hoy))
+        .route("/sync", get(sync_bajar).post(sync_subir))
         .route("/canales", get(canales).post(crear_canal))
         .route("/canales/{id}", axum::routing::patch(cambiar_canal))
         .route("/publicaciones", get(publicaciones).post(crear_publicacion))

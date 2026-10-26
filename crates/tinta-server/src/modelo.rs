@@ -26,6 +26,48 @@ pub const ESTADOS: [&str; 5] = ["idea", "borrador", "revision", "listo", "public
 pub const IDIOMAS: [&str; 2] = ["es", "en"];
 pub const TIPOS: [&str; 8] = ["parrafo", "subtitulo", "lista", "cita", "codigo", "imagen", "audio", "youtube"];
 
+/// Ids que elige el cliente al crear sin conexión, uno por tipo de pieza.
+/// Solo los usa la sincronización (`sync.rs`) mientras aplica una
+/// operación: así el móvil puede referirse a lo que creó antes de enviarlo.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct IdsDados {
+    pub articulo: Option<String>,
+    pub idioma: Option<String>,
+    pub rama: Option<String>,
+    pub seccion: Option<String>,
+    pub variante_seccion: Option<String>,
+    pub bloque: Option<String>,
+    pub variante_bloque: Option<String>,
+    pub publicacion: Option<String>,
+    pub medio: Option<String>,
+}
+
+thread_local! {
+    static DADOS: std::cell::RefCell<IdsDados> = std::cell::RefCell::new(IdsDados::default());
+}
+
+pub fn id_valido(id: &str) -> bool {
+    id.len() == 24 && id.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
+
+/// Ejecuta `f` usando los ids dados en lugar de generarlos. Cada uno se usa
+/// una sola vez: la primera pieza de su tipo que se cree.
+pub fn con_ids<T>(ids: IdsDados, f: impl FnOnce() -> Res<T>) -> Res<T> {
+    let todos = [&ids.articulo, &ids.idioma, &ids.rama, &ids.seccion, &ids.variante_seccion, &ids.bloque, &ids.variante_bloque, &ids.publicacion, &ids.medio];
+    if let Some(malo) = todos.into_iter().flatten().find(|i| !id_valido(i)) {
+        return Err(Error::Invalido(format!("id no válido (24 caracteres hexadecimales en minúscula): {malo}")));
+    }
+    DADOS.with(|d| *d.borrow_mut() = ids);
+    let r = f();
+    DADOS.with(|d| *d.borrow_mut() = IdsDados::default());
+    r
+}
+
+/// El id dado para ese tipo de pieza, si lo hay; si no, uno nuevo.
+pub fn id_para(campo: fn(&mut IdsDados) -> &mut Option<String>) -> String {
+    DADOS.with(|d| campo(&mut d.borrow_mut()).take()).unwrap_or_else(nuevo_id)
+}
+
 pub fn nuevo_id() -> String {
     let mut b = [0u8; 12];
     getrandom::fill(&mut b).expect("generador aleatorio del sistema");
@@ -427,7 +469,7 @@ fn articulo_de(c: &Connection, tabla: &str, id: &str) -> Res<String> {
 pub fn crear_articulo(c: &mut Connection, titulo: &str) -> Res<Articulo> {
     let tx = c.transaction()?;
     let rev = siguiente_rev(&tx)?;
-    let id = nuevo_id();
+    let id = id_para(|d| &mut d.articulo);
     let s = slug_libre(&tx, &slug(titulo), None)?;
     let t = ahora();
     tx.execute(
@@ -440,12 +482,12 @@ pub fn crear_articulo(c: &mut Connection, titulo: &str) -> Res<Articulo> {
 }
 
 fn crear_idioma_vacio(c: &Connection, articulo_id: &str, idioma: &str, titulo: &str, rev: i64) -> Res<String> {
-    let iid = nuevo_id();
+    let iid = id_para(|d| &mut d.idioma);
     c.execute(
         "INSERT INTO idiomas (id, articulo_id, idioma, titulo, rev) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![iid, articulo_id, idioma, titulo, rev],
     )?;
-    let rid = nuevo_id();
+    let rid = id_para(|d| &mut d.rama);
     c.execute(
         "INSERT INTO ramas (id, idioma_id, nombre, creado, rev) VALUES (?1, ?2, 'principal', ?3, ?4)",
         params![rid, iid, ahora(), rev],
@@ -457,7 +499,7 @@ fn crear_idioma_vacio(c: &Connection, articulo_id: &str, idioma: &str, titulo: &
 
 /// Crea una sección con una variante y un párrafo vacío. Devuelve su id.
 fn insertar_seccion(c: &Connection, rama_id: &str, pos: &str, titulo: &str, rev: i64) -> Res<String> {
-    let sid = nuevo_id();
+    let sid = id_para(|d| &mut d.seccion);
     c.execute(
         "INSERT INTO secciones (id, rama_id, posicion, rev) VALUES (?1, ?2, ?3, ?4)",
         params![sid, rama_id, pos, rev],
@@ -469,7 +511,7 @@ fn insertar_seccion(c: &Connection, rama_id: &str, pos: &str, titulo: &str, rev:
 }
 
 fn insertar_variante_seccion(c: &Connection, seccion_id: &str, titulo: &str, origen: &str, rev: i64) -> Res<String> {
-    let id = nuevo_id();
+    let id = id_para(|d| &mut d.variante_seccion);
     c.execute(
         "INSERT INTO variantes_seccion (id, seccion_id, titulo, origen, creado, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![id, seccion_id, titulo, origen, ahora(), rev],
@@ -487,7 +529,7 @@ fn insertar_bloque(
     origen: &str,
     rev: i64,
 ) -> Res<(String, String)> {
-    let bid = nuevo_id();
+    let bid = id_para(|d| &mut d.bloque);
     c.execute(
         "INSERT INTO bloques (id, variante_seccion_id, posicion, tipo, rev) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![bid, vs_id, pos, tipo, rev],
@@ -498,7 +540,7 @@ fn insertar_bloque(
 }
 
 fn insertar_variante_bloque(c: &Connection, bloque_id: &str, contenido: &str, origen: &str, rev: i64) -> Res<String> {
-    let id = nuevo_id();
+    let id = id_para(|d| &mut d.variante_bloque);
     let t = ahora();
     c.execute(
         "INSERT INTO variantes_bloque (id, bloque_id, contenido, origen, creado, cambiado, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)",
@@ -1458,7 +1500,7 @@ pub struct Medio {
 pub fn registrar_medio(c: &mut Connection, sha256: &str, nombre: &str, tipo: &str, tamano: i64) -> Res<Medio> {
     let tx = c.transaction()?;
     let rev = siguiente_rev(&tx)?;
-    let id = nuevo_id();
+    let id = id_para(|d| &mut d.medio);
     tx.execute(
         "INSERT INTO medios (id, sha256, nombre, tipo, tamano, creado, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![id, sha256, nombre, tipo, tamano, ahora(), rev],

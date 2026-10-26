@@ -3,7 +3,7 @@
   import { api, ESTADOS, NOMBRE_ESTADO, type Estado } from '../lib/api';
   import { vistazo } from '../lib/critic';
   import { activaBloque, ControlEditor } from '../lib/editor.svelte';
-  import { catalogo, fallo, ir, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
+  import { catalogo, eliminarArticulo, fallo, ir, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
   import Icono from '../componentes/Icono.svelte';
   import Inspector from '../componentes/Inspector.svelte';
   import Lateral from '../componentes/Lateral.svelte';
@@ -17,7 +17,7 @@
   let error = $state<string | null>(null);
   let exportar = $state(false);
   let planear = $state(false);
-  let menu = $state<'estado' | 'rama' | 'serie' | 'en' | null>(null);
+  let menu = $state<'estado' | 'rama' | 'serie' | 'en' | 'mas' | null>(null);
   let pedidoHistorial = $state(0);
 
   onMount(() => {
@@ -135,6 +135,13 @@
     menu = null;
     ir(`/a/${articuloId}/${l}`);
   }
+  async function eliminar() {
+    menu = null;
+    const es = a!.idiomas.find((i) => i.idioma === 'es');
+    const nombre = idioma?.idioma === 'es' || !es ? titulo : es.titulo;
+    await ctl.flush();
+    if (await eliminarArticulo(a!.id, nombre)) ir('/');
+  }
   async function crearEn(copiar: boolean) {
     menu = null;
     try {
@@ -219,6 +226,14 @@
         <button class="btn" onclick={() => (planear = true)}><Icono n="difundir" />Planear difusión</button>
         <button class="btn" onclick={abrirExportar}><Icono n="copiar" />Copiar para X</button>
         <button class="btn primario" onclick={abrirExportar}><Icono n="descargar" />Exportar</button>
+        <span class="desplegable">
+          <button class="btn" style="width:32px;padding:0;justify-content:center" title="Más acciones" aria-label="Más acciones" aria-expanded={menu === 'mas'} onclick={() => (menu = menu === 'mas' ? null : 'mas')}><Icono n="puntos" /></button>
+          {#if menu === 'mas'}
+            <div class="menu der" role="menu">
+              <button role="menuitem" onclick={eliminar}>Eliminar artículo</button>
+            </div>
+          {/if}
+        </span>
       {/if}
     </header>
 

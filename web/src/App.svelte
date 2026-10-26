@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, cuandoSinSesion } from './lib/api';
-  import { avisos, confirmacion, dialogo, nav, recargarCatalogo } from './lib/estado.svelte';
+  import { avisos, confirmacion, dialogo, nav, quitarAviso, recargarCatalogo } from './lib/estado.svelte';
   import Entrar from './vistas/Entrar.svelte';
   import Articulos from './vistas/Articulos.svelte';
   import Editor from './vistas/Editor.svelte';
@@ -67,7 +67,12 @@
   {@const c = confirmacion.actual}
   <div class="dialogo-velo" role="presentation" onmousedown={(e) => e.target === e.currentTarget && c.resolver(false)}>
     <div class="dialogo" role="alertdialog" aria-label={c.texto}>
-      <p style="color:var(--text);font-size:14px">{c.texto}</p>
+      {#if c.ayuda}
+        <h2>{c.texto}</h2>
+        <p>{c.ayuda}</p>
+      {:else}
+        <p style="color:var(--text);font-size:14px">{c.texto}</p>
+      {/if}
       <div class="acc">
         <button class="btn fantasma" onclick={() => c.resolver(false)}>Cancelar</button>
         <!-- svelte-ignore a11y_autofocus -->
@@ -79,6 +84,12 @@
 
 <div class="avisos" aria-live="polite">
   {#each avisos as a (a.id)}
-    <div class:error={a.tipo === 'error'}>{a.texto}</div>
+    <div class:error={a.tipo === 'error'}>
+      {a.texto}
+      {#if a.accion}
+        {@const accion = a.accion}
+        <button onclick={() => { quitarAviso(a.id); accion.hacer(); }}>{accion.texto}</button>
+      {/if}
+    </div>
   {/each}
 </div>

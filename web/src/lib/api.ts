@@ -252,6 +252,7 @@ export const api = {
   crearArticulo: (titulo: string) => post<Articulo>('/articulos', { titulo }),
   cambiarArticulo: (id: string, c: Record<string, unknown>) => patch<Articulo>(`/articulos/${id}`, c),
   borrarArticulo: (id: string) => del<void>(`/articulos/${id}`),
+  restaurarArticulo: (id: string) => post<Articulo>(`/articulos/${id}/restaurar`),
   crearIdioma: (id: string, idioma: string, copiar_de: string | null) => post<Articulo>(`/articulos/${id}/idiomas`, { idioma, copiar_de }),
   cambiarIdioma: (id: string, c: Partial<Omit<Idioma, 'id' | 'idioma'>>) => patch<Articulo>(`/idiomas/${id}`, c),
   borrarIdioma: (id: string) => del<Articulo>(`/idiomas/${id}`),

@@ -23,6 +23,9 @@ button.chip { cursor: pointer; }
 /* Avisos */
 .avisos { position: fixed; z-index: 90; left: 50%; bottom: 52px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .avisos div { pointer-events: auto; max-width: 560px; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-text); font-size: 13px; box-shadow: var(--shadow); }
+.avisos div:has(button) { display: flex; align-items: center; gap: 14px; }
+.avisos button { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; padding: 2px 4px; margin: -2px -4px -2px 0; border-radius: 6px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.avisos button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .avisos div.error { background: var(--surface); color: var(--text); border: 1px solid var(--text); }
 
 /* Diálogo */

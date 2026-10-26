@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, cuando, ESTADOS, NOMBRE_ESTADO, type Articulo, type Estado } from '../lib/api';
-  import { canal, catalogo, fallo, ir, nav, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
+  import { canal, catalogo, eliminarArticulo, fallo, ir, nav, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
   import { fechaCorta } from '../lib/calendario';
   import Icono from '../componentes/Icono.svelte';
   import Lateral from '../componentes/Lateral.svelte';
@@ -8,7 +8,16 @@
   const PLURAL: Record<Estado, string> = { idea: 'Ideas', borrador: 'Borradores', revision: 'Revisión', listo: 'Listos', publicado: 'Publicados' };
   let buscar = $state('');
   let estado = $state<Estado | 'todos'>('todos');
+  let menu = $state<string | null>(null);
   recargarCatalogo();
+
+  $effect(() => {
+    const cerrar = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.desplegable')) menu = null;
+    };
+    window.addEventListener('mousedown', cerrar);
+    return () => window.removeEventListener('mousedown', cerrar);
+  });
 
   const filtro = $derived(new URLSearchParams(nav.buscar));
   const serie = $derived(filtro.get('serie'));
@@ -46,6 +55,11 @@
     }
   }
 
+  function eliminar(a: Articulo) {
+    menu = null;
+    eliminarArticulo(a.id, principal(a)?.titulo ?? '');
+  }
+
   function abrir(e: MouseEvent, a: Articulo) {
     e.preventDefault();
     ir(`/a/${a.id}`);
@@ -54,6 +68,7 @@
 
 {#snippet fila(a: Articulo)}
   {@const p = principal(a)}
+  <div class="fila-c">
   <a class="fila" href="/a/{a.id}" onclick={(e) => abrir(e, a)}>
     <div class="t">
       <b>{p?.titulo || 'Sin título'}</b>
@@ -81,6 +96,15 @@
     </div>
     <span class="peq">{cuando(a.cambiado)}</span>
   </a>
+  <span class="desplegable mas">
+    <button class="btn fantasma" title="Más acciones" aria-label="Más acciones" aria-expanded={menu === a.id} onclick={() => (menu = menu === a.id ? null : a.id)}><Icono n="puntos" /></button>
+    {#if menu === a.id}
+      <div class="menu der" role="menu">
+        <button role="menuitem" onclick={() => eliminar(a)}>Eliminar</button>
+      </div>
+    {/if}
+  </span>
+  </div>
 {/snippet}
 
 <div class="app">
@@ -142,4 +166,19 @@
   .pestanas button.sel { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); font-weight: 500; }
   .pestanas button small { color: var(--faint); margin-left: 4px; }
   .vacio-centro .btn { margin-top: 8px; }
+
+  /* Hueco a la derecha de cada fila para el botón ⋯, que va fuera del enlace. */
+  .fila { grid-template-columns: minmax(0, 1fr) 150px 110px 150px 90px 28px; }
+  .lista { overflow: visible; }
+  .fila-c { position: relative; border-top: 1px solid var(--line); }
+  .fila-c:first-child { border-top: 0; }
+  .fila-c .fila { border-top: 0; }
+  .fila-c:hover .fila { background: var(--surface-2); }
+  .fila-c:first-child .fila { border-radius: 12px 12px 0 0; }
+  .fila-c:last-child .fila { border-radius: 0 0 12px 12px; }
+  .fila-c:only-child .fila { border-radius: 12px; }
+  .mas { position: absolute; right: 12px; top: calc(50% - 16px); }
+  .mas > .btn { width: 32px; padding: 0; justify-content: center; color: var(--faint); }
+  .mas > .btn:hover, .mas > .btn[aria-expanded='true'] { color: var(--text); background: var(--surface); }
+  .mas .menu { min-width: 160px; }
 </style>

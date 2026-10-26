@@ -21,17 +21,21 @@ export interface Aviso {
   id: number;
   texto: string;
   tipo: 'info' | 'error';
+  accion?: { texto: string; hacer: () => void };
 }
 export const avisos = $state<Aviso[]>([]);
 let siguiente = 1;
 
-export function avisar(texto: string, tipo: Aviso['tipo'] = 'info') {
+export function quitarAviso(id: number) {
+  const i = avisos.findIndex((a) => a.id === id);
+  if (i >= 0) avisos.splice(i, 1);
+}
+
+/** Con `accion`, el aviso lleva un botón y dura más, para dar tiempo a pulsarlo. */
+export function avisar(texto: string, tipo: Aviso['tipo'] = 'info', accion?: Aviso['accion']) {
   const id = siguiente++;
-  avisos.push({ id, texto, tipo });
-  setTimeout(() => {
-    const i = avisos.findIndex((a) => a.id === id);
-    if (i >= 0) avisos.splice(i, 1);
-  }, tipo === 'error' ? 7000 : 4000);
+  avisos.push({ id, texto, tipo, accion });
+  setTimeout(() => quitarAviso(id), accion ? 8000 : tipo === 'error' ? 7000 : 4000);
 }
 
 export function fallo(e: unknown) {
@@ -66,15 +70,17 @@ export function pedirTexto(titulo: string, valor = '', aceptar = 'Aceptar', ayud
 interface Confirmacion {
   texto: string;
   aceptar: string;
+  ayuda?: string;
   resolver: (ok: boolean) => void;
 }
 export const confirmacion = $state<{ actual: Confirmacion | null }>({ actual: null });
 
-export function confirmar(texto: string, aceptar = 'Borrar'): Promise<boolean> {
+export function confirmar(texto: string, aceptar = 'Borrar', ayuda?: string): Promise<boolean> {
   return new Promise((resolver) => {
     confirmacion.actual = {
       texto,
       aceptar,
+      ayuda,
       resolver: (ok) => {
         confirmacion.actual = null;
         resolver(ok);
@@ -117,4 +123,37 @@ export async function recargarCatalogo() {
   } catch (e) {
     fallo(e);
   }
+}
+
+/** Pregunta antes, elimina el artículo y ofrece deshacerlo. Devuelve true si lo eliminó. */
+export async function eliminarArticulo(id: string, titulo: string): Promise<boolean> {
+  const nombre = titulo.trim() || 'Sin título';
+  const ok = await confirmar(
+    `¿Eliminar «${nombre}»?`,
+    'Eliminar',
+    'Se elimina en todos sus idiomas y ramas. También se quitan del calendario sus publicaciones sin publicar.',
+  );
+  if (!ok) return false;
+  try {
+    await api.borrarArticulo(id);
+  } catch (e) {
+    fallo(e);
+    return false;
+  }
+  catalogo.articulos = catalogo.articulos.filter((a) => a.id !== id);
+  difusion.version++;
+  avisar(`Eliminaste «${nombre}».`, 'info', {
+    texto: 'Deshacer',
+    hacer: async () => {
+      try {
+        await api.restaurarArticulo(id);
+        await recargarCatalogo();
+        difusion.version++;
+      } catch (e) {
+        fallo(e);
+      }
+    },
+  });
+  recargarCatalogo();
+  return true;
 }

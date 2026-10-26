@@ -143,3 +143,41 @@ export function vistazo(s: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+export interface Nota {
+  /** Índice de marca, el que usa /marcas (critic::resolver). */
+  indice: number;
+  /** Orden entre las notas del bloque, desde 0. */
+  orden: number;
+  texto: string;
+  ia: string | null;
+  /** El texto anclado ({==x==} justo antes), si lo hay. */
+  ancla: string | null;
+}
+
+/** Las notas de un bloque, en orden. */
+export function notas(s: string): Nota[] {
+  const r: Nota[] = [];
+  let indice = 0;
+  const trozos = leer(s);
+  trozos.forEach((t, i) => {
+    if (t.t === 'texto' || t.t === 'resaltado') return;
+    if (t.t === 'nota') {
+      const prev = trozos[i - 1];
+      r.push({ indice, orden: r.length, texto: t.texto, ia: t.ia, ancla: prev?.t === 'resaltado' ? prev.texto : null });
+    }
+    indice++;
+  });
+  return r;
+}
+
+/** Cambia el texto de la nota número `orden` (entre las notas). */
+export function editarNota(s: string, orden: number, texto: string): string {
+  let n = 0;
+  const trozos = leer(s).map((t) => {
+    if (t.t !== 'nota') return t;
+    // «<<}» dentro de la nota la cerraría antes de tiempo.
+    return n++ === orden ? { ...t, texto: texto.replaceAll('<<}', '<< }') } : t;
+  });
+  return escribir(trozos);
+}

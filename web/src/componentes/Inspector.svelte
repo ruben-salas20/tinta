@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { api, cuando, NOMBRE_ESTADO_PUB, quien, type EntradaHistorial, type IdiomaDetalle, type Publicacion, type VarianteBloque } from '../lib/api';
   import { fechaCorta } from '../lib/calendario';
-  import { contar, vistazo } from '../lib/critic';
+  import { contar, notas as leerNotas, vistazo } from '../lib/critic';
   import { activaBloque, activaSeccion, type ControlEditor } from '../lib/editor.svelte';
   import { canal, confirmar, difusion, fallo, ir, pedirTexto } from '../lib/estado.svelte';
   import Icono from './Icono.svelte';
@@ -43,6 +43,17 @@
         if (v.origen.startsWith('ia:')) r.push({ bloque: u.bloque.id, seccion: sec, texto: vistazo(v.contenido).slice(0, 90), tipo: 'variante', quien: quien(v.origen) });
         else if (v.origen === 'conflicto') r.push({ bloque: u.bloque.id, seccion: sec, texto: vistazo(v.contenido).slice(0, 90), tipo: 'conflicto', quien: 'conflicto' });
       }
+    }
+    return r;
+  });
+
+  // Notas de lo activo, en el orden del artículo.
+  const notas = $derived.by(() => {
+    const r: { bloque: string; seccion: string; texto: string; quien: string | null }[] = [];
+    for (const u of ctl.visibles()) {
+      const a = activaBloque(u.bloque);
+      if (!a) continue;
+      for (const n of leerNotas(a.contenido)) r.push({ bloque: u.bloque.id, seccion: u.vs.titulo || 'Entrada', texto: n.texto, quien: n.ia });
     }
     return r;
   });
@@ -232,6 +243,18 @@
       </button>
     {:else}
       <p class="ayuda">Nada pendiente. Cuando un agente proponga cambios por MCP, saldrán aquí.</p>
+    {/each}
+  </div>
+
+  <div>
+    <h3><Icono n="nota" s />Notas<span class="n">{notas.length}</span></h3>
+    {#each notas as nt, i (i)}
+      <button class="tarjeta-v prop" onclick={() => ctl.enfocar(nt.bloque, 'inicio')}>
+        <div class="cab">{#if nt.quien}<span class="ia">IA</span><span>{nt.quien}</span>{:else}<span>Tú</span>{/if}<span>· «{nt.seccion}»</span></div>
+        <p>{nt.texto}</p>
+      </button>
+    {:else}
+      <p class="ayuda">Sin notas. Selecciona texto y pulsa «Nota» para dejar una.</p>
     {/each}
   </div>
 

@@ -5,6 +5,7 @@
 import { tick } from 'svelte';
 import { api, type Articulo, type Bloque, type Documento, type Entre, type Seccion, type TipoBloque, type VarianteBloque, type VarianteSeccion } from './api';
 import { avisar, fallo } from './estado.svelte';
+import { editarNota } from './critic';
 
 const ESPERA_MS = 800;
 
@@ -275,6 +276,33 @@ export class ControlEditor {
     } catch (e) {
       fallo(e);
     }
+  }
+
+  /** Cambia el texto de una nota, como un cambio hecho desde fuera del editor. */
+  async editarNota(varianteId: string, orden: number, texto: string) {
+    try {
+      await this.flush(varianteId);
+      const v = this.buscarVariante(varianteId);
+      if (!v) return;
+      const g = await api.guardar(varianteId, editarNota(v.contenido, orden, texto), this.revs.get(varianteId) ?? v.rev);
+      if (g.conflicto) {
+        avisar('Este párrafo cambió en otro sitio. Tu cambio quedó guardado como otra variante, marcada «conflicto».', 'error');
+        await this.recargar();
+        return;
+      }
+      await this.aplicarGuardado(g.variante);
+    } catch (e) {
+      fallo(e);
+    }
+  }
+
+  private buscarVariante(id: string): VarianteBloque | undefined {
+    for (const s of this.doc?.secciones ?? [])
+      for (const vs of s.variantes)
+        for (const b of vs.bloques) {
+          const v = b.variantes.find((x) => x.id === id);
+          if (v) return v;
+        }
   }
 
   async resolver(varianteId: string, indice: number, decision: 'aceptar' | 'rechazar') {

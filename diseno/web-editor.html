@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinta · editor</title>
+<link rel="icon" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="tema.js"></script>
+<link rel="stylesheet" href="estilos.css">
+<link rel="stylesheet" href="web.css">
+<style>
+  .cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+  .hoja { padding: 48px 56px 140px; }
+  .papel { max-width: 660px; margin: 0 auto; }
+
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 22px; }
+  .titulo { font: 600 32px/1.2 var(--serif); letter-spacing: -0.015em; margin: 0 0 10px; }
+  .entradilla { font: italic 16.5px/1.55 var(--serif); color: var(--muted); margin: 0 0 44px; }
+
+  /* Sección: subtítulo con su barra de variantes */
+  .seccion { position: relative; margin-top: 52px; }
+  .seccion-barra { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--faint); }
+  .seccion-barra .var { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+  .seccion h2 { font: 600 21px/1.35 var(--serif); margin: 0 0 14px; }
+
+  /* Bloque: un párrafo, imagen, código... */
+  .bloque { position: relative; margin: 0 -14px; padding: 4px 14px; border-radius: 8px; }
+  .bloque p, .bloque { font: 16.5px/1.75 var(--serif); }
+  .bloque p { margin: 0; }
+  .bloque + .bloque { margin-top: 18px; }
+  .bloque .asa { position: absolute; left: -26px; top: 9px; color: var(--faint); opacity: 0; }
+  .bloque:hover .asa, .bloque.foco .asa { opacity: 1; }
+  .bloque.foco { background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong); }
+  .bloque .pastilla { position: absolute; right: -58px; top: 8px; }
+  .bloque .marca-nota { position: absolute; right: -58px; top: 40px; color: var(--muted); }
+
+  .barra-bloque {
+    position: absolute; top: -40px; left: 10px; z-index: 4;
+    display: flex; gap: 2px; padding: 4px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow);
+    font: 13px var(--sans);
+  }
+  .barra-bloque button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+  .barra-bloque button:hover { background: var(--surface-2); }
+  .barra-bloque .sep { width: 1px; background: var(--line); margin: 4px 2px; }
+
+  /* Nota al margen */
+  .margen { position: relative; margin: 10px 0 2px auto; width: 300px; font: 13px/1.45 var(--sans); padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+  .margen .quien { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); margin-bottom: 4px; }
+
+  /* Propuesta del agente dentro del texto */
+  .propuesta-acc { display: inline-flex; gap: 2px; vertical-align: 2px; margin-left: 4px; }
+  .propuesta-acc button { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; padding: 0; }
+
+  pre.codigo { margin: 0; padding: 16px 18px; background: var(--surface-2); border-radius: 10px; font: 12.5px/1.65 var(--mono); overflow-x: auto; }
+  pre.codigo .c { color: var(--faint); }
+  .lenguaje { font: 11px var(--mono); color: var(--faint); margin-bottom: 4px; }
+
+  .medio { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); font-family: var(--sans); }
+  .medio .lienzo { aspect-ratio: 16/7; background:
+      repeating-linear-gradient(135deg, var(--surface-2) 0 10px, var(--surface-3) 10px 20px);
+      display: grid; place-items: center; color: var(--faint); font-size: 13px; }
+  .medio .pie { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  .medio .pie b { color: var(--text); font-weight: 500; }
+
+  .yt { display: grid; grid-template-columns: 180px 1fr; }
+  .yt .mini { position: relative; background: #1b1b1b; aspect-ratio: 16/9; display: grid; place-items: center; }
+  .yt .mini span { width: 40px; height: 28px; border-radius: 8px; background: #f2f2f2; color: #111; display: grid; place-items: center; }
+  .yt .txt { padding: 12px 14px; font-size: 13px; color: var(--muted); }
+  .yt .txt b { display: block; color: var(--text); font-weight: 500; margin-bottom: 2px; }
+
+  .audio { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .audio .bot { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; flex: none; }
+  .onda { flex: 1; height: 26px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 2px, transparent 2px 5px); mask: linear-gradient(90deg, #000 30%, #0006 30%); border-radius: 2px; }
+
+  .conflicto { margin: 0 -14px 8px; padding: 10px 14px; border-radius: 10px; border: 1px dashed var(--line-strong); font: 13px/1.45 var(--sans); display: flex; gap: 10px; align-items: flex-start; }
+  .conflicto .acc { display: flex; gap: 6px; margin-top: 8px; }
+
+  .nuevo { margin-top: 18px; display: flex; align-items: center; gap: 8px; color: var(--faint); font: 15px var(--serif); position: relative; }
+  .nuevo .barra { font-family: var(--mono); }
+
+  /* Inspector */
+  .inspector { border-left: 1px solid var(--line); background: var(--surface); padding: 22px 20px; display: flex; flex-direction: column; gap: 32px; position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .inspector h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  .inspector h3 .n { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); }
+  .tarjeta-v { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 12.5px; }
+  .tarjeta-v + .tarjeta-v { margin-top: 10px; }
+  .tarjeta-v.activa { border-color: var(--text); }
+  .tarjeta-v .cab { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); margin-bottom: 4px; }
+  .tarjeta-v .cab b { color: var(--text); font-weight: 600; }
+  .tarjeta-v .cab .d { margin-left: auto; }
+  .tarjeta-v p { margin: 0; font: 13.5px/1.55 var(--serif); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tarjeta-v .acc { display: flex; gap: 6px; margin-top: 8px; }
+  .tarjeta-v .acc .btn { height: 26px; padding: 0 9px; font-size: 12px; }
+
+  .ramas div.r { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 7px; font-size: 13px; }
+  .ramas div.r.sel { background: var(--surface-2); }
+  .ramas .r small { margin-left: auto; color: var(--faint); font-size: 12px; }
+
+  .linea { position: relative; padding-left: 16px; font-size: 12.5px; }
+  .linea::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
+  .linea div { position: relative; padding: 5px 0; color: var(--muted); }
+  .linea div::before { content: ""; position: absolute; left: -15px; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--line-strong); }
+  .linea div.ahora::before { background: var(--text); border-color: var(--text); }
+  .linea div b { color: var(--text); font-weight: 500; }
+
+  .estado { white-space: nowrap; position: fixed; left: 224px; right: 340px; bottom: 0; display: flex; gap: 16px; align-items: center; padding: 8px 20px; font-size: 12px; color: var(--faint); background: color-mix(in srgb, var(--bg) 90%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(8px); }
+  .estado .espacio { flex: 1; }
+
+  .idiomas { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; height: 32px; }
+  .idiomas span { display: grid; place-items: center; padding: 0 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .idiomas span.sel { background: var(--accent); color: var(--accent-text); }
+
+  svg.i { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; width: 16px; height: 16px; flex: none; }
+  svg.i.s { width: 14px; height: 14px; }
+  svg.f { fill: currentColor; stroke: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="lateral">
+    <a class="logo" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg>Tinta</a>
+    <a class="item activo" href="web-articulos.html"><svg class="i"><use href="iconos.svg#articulos"/></svg>Artículos<span class="n">12</span></a>
+    <a class="item" href="web-calendario.html"><svg class="i"><use href="iconos.svg#calendario"/></svg>Calendario<span class="n">7</span></a>
+    <div class="grupo">Series</div>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#serie"/></svg>Montando ai-lab<span class="n">3</span></a>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#serie"/></svg>Dirigir agentes<span class="n">2</span></a>
+    <div class="grupo">Etiquetas</div>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#etiqueta"/></svg>ia</a>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#etiqueta"/></svg>ai-lab</a>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#etiqueta"/></svg>android</a>
+    <div class="pie">
+      <span style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#nube"/></svg>Sincronizado (5 min)</span>
+      <span style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#agente"/></svg>MCP: Claude conectado</span>
+    </div>
+  </nav>
+
+  <div>
+    <header class="cabecera">
+      <a class="btn fantasma" href="web-articulos.html" style="padding:0 6px"><svg class="i"><use href="iconos.svg#izq"/></svg></a>
+      <h1><span class="ruta">Artículos /</span> llama-swap: un contenedor para todos mis modelos</h1>
+      <span class="chip punto e-borrador">Borrador</span>
+      <div class="espacio"></div>
+      <div class="idiomas"><span class="sel">ES</span><span>EN</span></div>
+      <button class="btn"><svg class="i"><use href="iconos.svg#rama"/></svg>principal<svg class="i s"><use href="iconos.svg#abajo"/></svg></button>
+      <button class="btn"><svg class="i"><use href="iconos.svg#difundir"/></svg>Planear difusión</button>
+      <a class="btn" href="web-exportar.html"><svg class="i"><use href="iconos.svg#copiar"/></svg>Copiar para X</a>
+      <a class="btn primario" href="web-exportar.html"><svg class="i"><use href="iconos.svg#descargar"/></svg>Exportar</a>
+    </header>
+
+    <div class="cuerpo">
+      <div class="hoja">
+        <article class="papel">
+          <div class="meta">
+            <span class="chip"><svg class="i s"><use href="iconos.svg#serie"/></svg>Montando ai-lab · parte 2</span>
+            <span class="chip">ia</span><span class="chip">ai-lab</span>
+            <span class="chip" style="border-style:dashed">+ etiqueta</span>
+          </div>
+          <h1 class="titulo">llama-swap: un contenedor para todos mis modelos</h1>
+          <p class="entradilla">Cómo dejé de tener un servicio por modelo y por qué la GPU ahora descansa cuando no la uso.</p>
+
+          <section class="seccion">
+            <div class="seccion-barra">
+              <span class="var"><svg class="i s"><use href="iconos.svg#variantes"/></svg>Sección · variante A de 2<svg class="i s"><use href="iconos.svg#abajo"/></svg></span>
+            </div>
+            <h2>Por qué no un contenedor por modelo</h2>
+
+            <div class="bloque">
+              <svg class="i asa"><use href="iconos.svg#asa"/></svg>
+              <p>Al principio cada modelo tenía su propio contenedor. Funcionaba, pero con 6 GB de VRAM solo cabía uno encendido a la vez, y yo tenía que acordarme de cuál apagar.</p>
+            </div>
+
+            <div class="bloque">
+              <svg class="i asa"><use href="iconos.svg#asa"/></svg>
+              <p>llama-swap cambia eso: <span class="tachado">es un programa muy sencillo y muy potente que</span> arranca el modelo que pide cada petición y apaga el anterior. <span class="nota-ancla">La GPU queda libre en cuanto pasa el tiempo de espera.</span></p>
+              <svg class="i marca-nota"><use href="iconos.svg#nota"/></svg>
+              <aside class="margen">
+                <div class="quien"><svg class="i s"><use href="iconos.svg#nota"/></svg>Tú · ayer</div>
+                Poner aquí cuánto tarda en cargar Gemma la primera vez.
+              </aside>
+            </div>
+
+            <div class="bloque foco">
+              <div class="barra-bloque">
+                <button><svg class="i"><use href="iconos.svg#variantes"/></svg>Fork del párrafo</button>
+                <button><svg class="i"><use href="iconos.svg#tachar"/></svg>Tachar</button>
+                <button><svg class="i"><use href="iconos.svg#nota"/></svg>Nota</button>
+                <span class="sep"></span>
+                <button><svg class="i"><use href="iconos.svg#historial"/></svg></button>
+                <button><svg class="i"><use href="iconos.svg#puntos"/></svg></button>
+              </div>
+              <svg class="i asa"><use href="iconos.svg#asa"/></svg>
+              <p>La consecuencia que no esperaba fue otra: como ya no tengo que pensar en qué está encendido, pruebo modelos nuevos mucho más a menudo. Añadir uno es escribir cinco líneas en un archivo.</p>
+              <span class="chip pastilla"><svg class="i s"><use href="iconos.svg#variantes"/></svg>3</span>
+            </div>
+          </section>
+
+          <section class="seccion">
+            <h2>La configuración</h2>
+            <div class="bloque">
+              <svg class="i asa"><use href="iconos.svg#asa"/></svg>
+              <p>Cada modelo es una entrada del <code style="font:15px var(--mono)">config.yaml</code>. <span class="tachado">El ttl dice</span><span class="anadido">El campo <i>ttl</i> marca</span><span class="propuesta-acc"><span class="ia">IA</span><button title="Aceptar"><svg class="i s"><use href="iconos.svg#check"/></svg></button><button title="Descartar"><svg class="i s"><use href="iconos.svg#x"/></svg></button></span> cuántos segundos sigue cargado sin peticiones.</p>
+            </div>
+            <div class="bloque">
+              <div class="lenguaje">yaml</div>
+              <pre class="codigo">models:
+  gemma-4-e4b-rapido:
+    cmd: llama-server -m /models/gemma-4-e4b.gguf --port ${PORT}
+    ttl: 300   <span class="c"># 5 min sin uso y se descarga</span></pre>
+            </div>
+            <div class="bloque">
+              <div class="medio">
+                <div class="lienzo"><span style="display:flex;gap:8px;align-items:center"><svg class="i"><use href="iconos.svg#imagen"/></svg>vram-en-reposo.png</span></div>
+                <div class="pie"><svg class="i s"><use href="iconos.svg#imagen"/></svg><b>Texto alternativo:</b> Gráfica de uso de VRAM que baja a cero tras cinco minutos sin peticiones</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="seccion">
+            <h2>Lo que aprendí</h2>
+            <div class="conflicto">
+              <svg class="i" style="margin-top:2px"><use href="iconos.svg#rama"/></svg>
+              <div>
+                <b>Este párrafo cambió en el móvil y en el portátil a la vez.</b> Tinta guardó las dos redacciones como variantes. Elige cuál queda; la otra no se pierde.
+                <div class="acc"><button class="btn">Ver las dos</button><button class="btn fantasma">Quedarme con la del portátil</button></div>
+              </div>
+            </div>
+            <div class="bloque">
+              <svg class="i asa"><use href="iconos.svg#asa"/></svg>
+              <p>No hace falta la máquina más grande. Hace falta que la máquina pequeña no desperdicie nada.</p>
+            </div>
+            <div class="bloque">
+              <div class="medio audio">
+                <span class="bot"><svg class="i f s"><use href="iconos.svg#play"/></svg></span>
+                <div class="onda"></div>
+                <span style="font-size:12px;color:var(--muted)">0:42 · resumen-en-voz.mp3</span>
+              </div>
+            </div>
+            <div class="bloque">
+              <div class="medio yt">
+                <div class="mini"><span><svg class="i f s"><use href="iconos.svg#play"/></svg></span></div>
+                <div class="txt"><b>Demo: cambiar de modelo en caliente</b>youtube.com/watch?v=jNQXAC9IVRw<br>Sale en el portfolio como portada con botón de play.</div>
+              </div>
+            </div>
+            <div class="nuevo">
+              <svg class="i"><use href="iconos.svg#mas"/></svg>
+              <span>Escribe, o pulsa <span class="barra">/</span> para insertar…</span>
+            </div>
+          </section>
+        </article>
+      </div>
+
+      <aside class="inspector">
+        <div>
+          <h3><svg class="i s"><use href="iconos.svg#variantes"/></svg>Variantes del párrafo<span class="n">3</span></h3>
+          <div class="tarjeta-v activa">
+            <div class="cab"><b>A · activa</b><span>Tú</span><span class="d">hoy 10:42</span></div>
+            <p>La consecuencia que no esperaba fue otra: como ya no tengo que pensar en qué está encendido…</p>
+          </div>
+          <div class="tarjeta-v">
+            <div class="cab"><b>B</b><span>Tú</span><span class="d">ayer</span></div>
+            <p>Lo mejor no fue ahorrar VRAM, sino dejar de tener miedo a probar modelos nuevos.</p>
+            <div class="acc"><button class="btn">Activar</button><button class="btn fantasma">Comparar</button></div>
+          </div>
+          <div class="tarjeta-v">
+            <div class="cab"><b>C</b><span class="ia">IA</span><span>Claude · propuesta</span></div>
+            <p>El efecto secundario más valioso: probar un modelo nuevo pasó de ser un proyecto a ser un rato.</p>
+            <div class="acc"><button class="btn">Activar</button><button class="btn fantasma">Comparar</button><button class="btn fantasma">Descartar</button></div>
+          </div>
+        </div>
+
+        <div class="ramas">
+          <h3><svg class="i s"><use href="iconos.svg#rama"/></svg>Ramas del artículo<span class="n">2</span></h3>
+          <div class="r sel"><svg class="i s"><use href="iconos.svg#check"/></svg><b>principal</b><small>la que se exporta</small></div>
+          <div class="r"><span style="width:14px"></span>enfoque-tutorial<small>desde el 20 oct</small></div>
+          <button class="btn fantasma" style="margin-top:4px"><svg class="i s"><use href="iconos.svg#mas"/></svg>Fork del artículo entero</button>
+        </div>
+
+        <div>
+          <h3><svg class="i s"><use href="iconos.svg#agente"/></svg>Propuestas del agente<span class="n">2 pendientes</span></h3>
+          <div class="tarjeta-v">
+            <div class="cab"><span class="ia">IA</span><span>Cambio en «La configuración»</span></div>
+            <p>«El ttl dice» → «El campo ttl marca»</p>
+          </div>
+          <div class="tarjeta-v">
+            <div class="cab"><span class="ia">IA</span><span>Traducción al inglés</span></div>
+            <p>Versión EN completa, en borrador y marcada translatedWithAI.</p>
+            <div class="acc"><button class="btn">Revisar</button></div>
+          </div>
+        </div>
+
+        <div>
+          <h3><svg class="i s"><use href="iconos.svg#historial"/></svg>Historial del párrafo</h3>
+          <div class="linea">
+            <div class="ahora"><b>Ahora</b> · editado en el portátil</div>
+            <div><b>Hoy 08:15</b> · editado en el móvil, sin conexión</div>
+            <div><b>Ayer 22:03</b> · creada la variante B</div>
+            <div><b>Ayer 21:40</b> · primer borrador</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+<div class="estado">
+  <span style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#check"/></svg>Guardado</span>
+  <span>612 palabras · 3 min de lectura</span>
+  <span>EN: propuesta del agente</span>
+  <span class="espacio"></span>
+  <span><span class="kbd">/</span> insertar <span class="kbd">Ctrl D</span> tachar <span class="kbd">Ctrl ⇧ F</span> fork</span>
+</div>
+</body>
+</html>

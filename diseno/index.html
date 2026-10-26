@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinta · maquetas</title>
+<link rel="icon" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="tema.js"></script>
+<link rel="stylesheet" href="estilos.css">
+<style>
+  main { max-width: 880px; margin: 0 auto; padding: 56px 20px 80px; }
+  .marca { display: flex; align-items: center; gap: 14px; }
+  .marca svg { width: 56px; height: 56px; }
+  h1 { font: 600 40px/1.1 var(--sans); letter-spacing: -0.03em; margin: 0; }
+  .lema { color: var(--muted); font-size: 16px; margin: 6px 0 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 48px 0 12px; font-weight: 600; }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .tarjeta { display: block; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; text-decoration: none; }
+  .tarjeta:hover { border-color: var(--line-strong); }
+  .tarjeta b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .tarjeta span { color: var(--muted); font-size: 13px; }
+  .logos { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .logos div { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 22px; }
+  .logos svg { width: 56px; height: 56px; }
+  .l1 { background: var(--surface); border: 1px solid var(--line); }
+  .l2 { background: #121212; color: #f2f2f2; }
+  .l3 { background: #f2f2f2; color: #121212; border: 1px solid #ddd; }
+  .muestras { display: flex; gap: 8px; flex-wrap: wrap; }
+  .muestras div { width: 64px; height: 44px; border-radius: 8px; border: 1px solid var(--line); }
+  ul { color: var(--muted); padding-left: 18px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg>
+    <div>
+      <h1>Tinta</h1>
+      <p class="lema">Calendario de contenido y escritura ordenada. Maquetas de la fase 0.</p>
+    </div>
+  </div>
+
+  <h2>Web, en el portátil</h2>
+  <div class="rejilla">
+    <a class="tarjeta" href="web-articulos.html"><b>Artículos</b><span>Lista con estados, etiquetas y series.</span></a>
+    <a class="tarjeta" href="web-editor.html"><b>Editor</b><span>Secciones, párrafos, variantes, tachado, propuestas del agente y ramas.</span></a>
+    <a class="tarjeta" href="web-calendario.html"><b>Calendario</b><span>Mes con publicaciones por canal y detalle de un hilo de X.</span></a>
+    <a class="tarjeta" href="web-exportar.html"><b>Exportar y copiar</b><span>El .zip para el portfolio y la copia para X Articles.</span></a>
+  </div>
+
+  <h2>Android</h2>
+  <div class="rejilla">
+    <a class="tarjeta" href="movil.html"><b>Las pantallas del móvil</b><span>Hoy, artículos, editor, variantes, conflicto, publicación y resumen diario.</span></a>
+  </div>
+
+  <h2>Logo</h2>
+  <div class="logos">
+    <div class="l1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg></div>
+    <div class="l2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg></div>
+    <div class="l3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg></div>
+  </div>
+  <ul>
+    <li>El bote lleva tinta hasta la mitad; la pluma entra por el cuello.</li>
+    <li>Un solo color: funciona como icono de Android (fondo negro o blanco) y como favicon.</li>
+  </ul>
+
+  <h2>Colores</h2>
+  <div class="muestras">
+    <div style="background:var(--bg)"></div>
+    <div style="background:var(--surface)"></div>
+    <div style="background:var(--surface-2)"></div>
+    <div style="background:var(--surface-3)"></div>
+    <div style="background:var(--line-strong)"></div>
+    <div style="background:var(--muted)"></div>
+    <div style="background:var(--text)"></div>
+  </div>
+  <ul>
+    <li>Cambia el tema de tu sistema y las maquetas cambian con él.</li>
+    <li>Todo es gris salvo los estados, que llevan una escala de color apagada:</li>
+  </ul>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px">
+    <span class="chip punto e-idea">Idea</span><span class="chip punto e-borrador">Borrador · preparando</span><span class="chip punto e-revision">Revisión</span><span class="chip punto e-listo">Listo · programada</span><span class="chip punto e-publicado">Publicado</span>
+  </div>
+  <ul>
+    <li>Cada red se reconoce por su icono oficial, en el color del texto:</li>
+  </ul>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0">
+    <span style="display:flex;gap:6px;align-items:center"><svg class="red g"><use href="redes.svg#x"/></svg>X</span>
+    <span style="display:flex;gap:6px;align-items:center"><svg class="red g"><use href="redes.svg#linkedin"/></svg>LinkedIn</span>
+    <span style="display:flex;gap:6px;align-items:center"><svg class="red g"><use href="redes.svg#instagram"/></svg>Instagram</span>
+    <span style="display:flex;gap:6px;align-items:center"><svg class="red g"><use href="redes.svg#portfolio"/></svg>Portfolio</span>
+    <span style="display:flex;gap:6px;align-items:center;color:var(--faint)"><svg class="red g"><use href="redes.svg#youtube"/></svg>YouTube</span>
+    <span style="display:flex;gap:6px;align-items:center;color:var(--faint)"><svg class="red g"><use href="redes.svg#tiktok"/></svg>TikTok</span>
+  </div>
+
+</main>
+</body>
+</html>

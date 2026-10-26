@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinta · artículos</title>
+<link rel="icon" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="tema.js"></script>
+<link rel="stylesheet" href="estilos.css">
+<link rel="stylesheet" href="web.css">
+<style>
+  .contenido { padding: 24px 28px 60px; max-width: 1180px; }
+  .filtros { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .pestanas { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 9px; }
+  .pestanas span { padding: 5px 11px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+  .pestanas span.sel { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); font-weight: 500; }
+  .pestanas span small { color: var(--faint); margin-left: 4px; }
+
+  .lista { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .fila { display: grid; grid-template-columns: minmax(0, 1fr) 150px 110px 150px 90px; gap: 16px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line); text-decoration: none; }
+  .fila:first-child { border-top: 0; }
+  .fila:hover { background: var(--surface-2); }
+  .fila.cab { font-size: 12px; color: var(--faint); padding-top: 10px; padding-bottom: 10px; background: var(--surface); }
+  .fila .t b { display: block; font: 600 16px/1.35 var(--serif); margin-bottom: 3px; }
+  .fila .t span { display: block; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fila .t .chips { display: flex; gap: 5px; margin-top: 7px; }
+  .fila .t .chips .chip { height: 20px; font-size: 11px; }
+  .idi { display: flex; gap: 4px; }
+  .idi span { font: 600 11px/1 var(--mono); padding: 4px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); }
+  .idi span.ok { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .idi span.ia { border-style: dashed; }
+  .prox { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .prox .vacio { color: var(--faint); }
+  .peq { font-size: 12px; color: var(--faint); }
+  .señales { display: flex; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 7px; }
+  .fila .t .señales span { display: inline-flex; align-items: center; gap: 4px; overflow: visible; }
+
+  .grupo-t { display: flex; align-items: center; gap: 10px; margin: 26px 0 10px; font-size: 13px; font-weight: 600; }
+  .grupo-t .chip { font-weight: 400; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="lateral">
+    <a class="logo" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg>Tinta</a>
+    <a class="item activo" href="web-articulos.html"><svg class="i"><use href="iconos.svg#articulos"/></svg>Artículos<span class="n">12</span></a>
+    <a class="item" href="web-calendario.html"><svg class="i"><use href="iconos.svg#calendario"/></svg>Calendario<span class="n">7</span></a>
+    <div class="grupo">Series</div>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#serie"/></svg>Montando ai-lab<span class="n">3</span></a>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#serie"/></svg>Dirigir agentes<span class="n">2</span></a>
+    <div class="grupo">Etiquetas</div>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#etiqueta"/></svg>ia</a>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#etiqueta"/></svg>ai-lab</a>
+    <a class="item" href="#"><svg class="i"><use href="iconos.svg#etiqueta"/></svg>android</a>
+    <div class="pie">
+      <span style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#nube"/></svg>Sincronizado (5 min)</span>
+      <span style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#agente"/></svg>MCP: Claude conectado</span>
+    </div>
+  </nav>
+
+  <div>
+    <header class="cabecera">
+      <h1>Artículos</h1>
+      <div class="espacio"></div>
+      <div class="buscar"><svg class="i s"><use href="iconos.svg#buscar"/></svg>Buscar en títulos y texto<span class="kbd" style="margin-left:auto">Ctrl K</span></div>
+      <button class="btn primario"><svg class="i"><use href="iconos.svg#mas"/></svg>Nuevo artículo</button>
+    </header>
+
+    <div class="contenido">
+      <div class="filtros">
+        <div class="pestanas">
+          <span class="sel">Todos<small>12</small></span>
+          <span>Ideas<small>4</small></span>
+          <span>Borradores<small>3</small></span>
+          <span>Revisión<small>1</small></span>
+          <span>Listos<small>1</small></span>
+          <span>Publicados<small>3</small></span>
+        </div>
+        <div class="espacio" style="flex:1"></div>
+        <button class="btn"><svg class="i s"><use href="iconos.svg#serie"/></svg>Serie<svg class="i s"><use href="iconos.svg#abajo"/></svg></button>
+        <button class="btn"><svg class="i s"><use href="iconos.svg#etiqueta"/></svg>Etiqueta<svg class="i s"><use href="iconos.svg#abajo"/></svg></button>
+        <button class="btn">Agrupar por estado<svg class="i s"><use href="iconos.svg#abajo"/></svg></button>
+      </div>
+
+      <div class="grupo-t">En marcha <span class="chip">5</span></div>
+      <div class="lista">
+        <div class="fila cab"><span>Artículo</span><span>Serie</span><span>Idiomas</span><span>Próxima publicación</span><span>Cambiado</span></div>
+
+        <a class="fila" href="web-editor.html">
+          <div class="t">
+            <b>llama-swap: un contenedor para todos mis modelos</b>
+            <span>Cómo dejé de tener un servicio por modelo y por qué la GPU ahora descansa cuando no la uso.</span>
+            <div class="señales">
+              <span class="chip punto e-borrador">Borrador</span>
+              <span><svg class="i s"><use href="iconos.svg#rama"/></svg>2 ramas</span>
+              <span><svg class="i s"><use href="iconos.svg#agente"/></svg>2 propuestas</span>
+              <span><svg class="i s"><use href="iconos.svg#variantes"/></svg>1 conflicto</span>
+            </div>
+          </div>
+          <span class="peq">Montando ai-lab · 2</span>
+          <div class="idi"><span class="ok">ES</span><span class="ia" title="Propuesta del agente">EN</span></div>
+          <div class="prox"><svg class="red"><use href="redes.svg#portfolio"/></svg>Lun 2 nov</div>
+          <span class="peq">hace 3 min</span>
+        </a>
+
+        <a class="fila" href="#">
+          <div class="t">
+            <b>Lo que aprendí dirigiendo agentes durante un mes</b>
+            <span>Qué cambió en cómo pido las cosas, y qué sigo haciendo mal.</span>
+            <div class="señales"><span class="chip punto e-revision">Revisión</span><span><svg class="i s"><use href="iconos.svg#nota"/></svg>4 notas</span></div>
+          </div>
+          <span class="peq">Dirigir agentes · 1</span>
+          <div class="idi"><span class="ok">ES</span><span class="ok">EN</span></div>
+          <div class="prox"><svg class="red"><use href="redes.svg#x"/></svg>Jue 29 oct</div>
+          <span class="peq">ayer</span>
+        </a>
+
+        <a class="fila" href="#">
+          <div class="t">
+            <b>Atalaya: leer el mundo en mi idioma</b>
+            <span>Un lector RSS que traduce en la torre, sin mandar nada fuera.</span>
+            <div class="señales"><span class="chip punto e-listo">Listo</span></div>
+          </div>
+          <span class="peq">Montando ai-lab · 3</span>
+          <div class="idi"><span class="ok">ES</span><span>EN</span></div>
+          <div class="prox"><svg class="red"><use href="redes.svg#portfolio"/></svg>Lun 9 nov</div>
+          <span class="peq">20 oct</span>
+        </a>
+
+        <a class="fila" href="#">
+          <div class="t">
+            <b>Copias de seguridad que de verdad se pueden restaurar</b>
+            <span>Idea: probar la restauración cada mes, no solo la copia.</span>
+            <div class="señales"><span class="chip punto e-idea">Idea</span></div>
+          </div>
+          <span class="peq">—</span>
+          <div class="idi"><span>ES</span></div>
+          <div class="prox"><span class="vacio">Sin planear</span></div>
+          <span class="peq">18 oct</span>
+        </a>
+
+        <a class="fila" href="#">
+          <div class="t">
+            <b>Una RTX 3050 da más de lo que parece</b>
+            <span>Idea: medir lo que cabe en 6 GB con números, no con opiniones.</span>
+            <div class="señales"><span class="chip punto e-idea">Idea</span></div>
+          </div>
+          <span class="peq">Montando ai-lab · —</span>
+          <div class="idi"><span>ES</span></div>
+          <div class="prox"><span class="vacio">Sin planear</span></div>
+          <span class="peq">12 oct</span>
+        </a>
+      </div>
+
+      <div class="grupo-t">Publicados <span class="chip">3</span></div>
+      <div class="lista">
+        <a class="fila" href="#">
+          <div class="t">
+            <b>Montando ai-lab: una torre para IA en casa</b>
+            <span>El hardware, el porqué y lo que no repetiría.</span>
+            <div class="señales"><span class="chip punto e-publicado">Publicado · 3 canales</span></div>
+          </div>
+          <span class="peq">Montando ai-lab · 1</span>
+          <div class="idi"><span class="ok">ES</span><span class="ok">EN</span></div>
+          <div class="prox"><span class="vacio">—</span></div>
+          <span class="peq">5 oct</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

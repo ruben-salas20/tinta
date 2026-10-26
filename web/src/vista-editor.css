@@ -1,0 +1,106 @@
+/* Copiado de diseno/web-editor.html (maqueta aprobada). */
+.cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+  .hoja { padding: 48px 56px 140px; }
+  .papel { max-width: 660px; margin: 0 auto; }
+
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 22px; }
+  .titulo { font: 600 32px/1.2 var(--serif); letter-spacing: -0.015em; margin: 0 0 10px; }
+  .entradilla { font: italic 16.5px/1.55 var(--serif); color: var(--muted); margin: 0 0 44px; }
+
+  /* Sección: subtítulo con su barra de variantes */
+  .seccion { position: relative; margin-top: 52px; }
+  .seccion-barra { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--faint); }
+  .seccion-barra .var { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+  .seccion h2 { font: 600 21px/1.35 var(--serif); margin: 0 0 14px; }
+
+  /* Bloque: un párrafo, imagen, código... */
+  .bloque { position: relative; margin: 0 -14px; padding: 4px 14px; border-radius: 8px; }
+  .bloque p, .bloque { font: 16.5px/1.75 var(--serif); }
+  .bloque p { margin: 0; }
+  .bloque + .bloque { margin-top: 18px; }
+  .bloque .asa { position: absolute; left: -26px; top: 9px; color: var(--faint); opacity: 0; }
+  .bloque:hover .asa, .bloque.foco .asa { opacity: 1; }
+  .bloque.foco { background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong); }
+  .bloque .pastilla { position: absolute; right: -58px; top: 8px; }
+  .bloque .marca-nota { position: absolute; right: -58px; top: 40px; color: var(--muted); }
+
+  .barra-bloque {
+    position: absolute; top: -40px; left: 10px; z-index: 4;
+    display: flex; gap: 2px; padding: 4px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow);
+    font: 13px var(--sans);
+  }
+  .barra-bloque button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+  .barra-bloque button:hover { background: var(--surface-2); }
+  .barra-bloque .sep { width: 1px; background: var(--line); margin: 4px 2px; }
+
+  /* Nota al margen */
+  .margen { position: relative; margin: 10px 0 2px auto; width: 300px; font: 13px/1.45 var(--sans); padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+  .margen .quien { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); margin-bottom: 4px; }
+
+  /* Propuesta del agente dentro del texto */
+  .propuesta-acc { display: inline-flex; gap: 2px; vertical-align: 2px; margin-left: 4px; }
+  .propuesta-acc button { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; padding: 0; }
+
+  pre.codigo { margin: 0; padding: 16px 18px; background: var(--surface-2); border-radius: 10px; font: 12.5px/1.65 var(--mono); overflow-x: auto; }
+  pre.codigo .c { color: var(--faint); }
+  .lenguaje { font: 11px var(--mono); color: var(--faint); margin-bottom: 4px; }
+
+  .medio { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); font-family: var(--sans); }
+  .medio .lienzo { aspect-ratio: 16/7; background:
+      repeating-linear-gradient(135deg, var(--surface-2) 0 10px, var(--surface-3) 10px 20px);
+      display: grid; place-items: center; color: var(--faint); font-size: 13px; }
+  .medio .pie { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  .medio .pie b { color: var(--text); font-weight: 500; }
+
+  .yt { display: grid; grid-template-columns: 180px 1fr; }
+  .yt .mini { position: relative; background: #1b1b1b; aspect-ratio: 16/9; display: grid; place-items: center; }
+  .yt .mini span { width: 40px; height: 28px; border-radius: 8px; background: #f2f2f2; color: #111; display: grid; place-items: center; }
+  .yt .txt { padding: 12px 14px; font-size: 13px; color: var(--muted); }
+  .yt .txt b { display: block; color: var(--text); font-weight: 500; margin-bottom: 2px; }
+
+  .audio { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .audio .bot { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; flex: none; }
+  .onda { flex: 1; height: 26px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 2px, transparent 2px 5px); mask: linear-gradient(90deg, #000 30%, #0006 30%); border-radius: 2px; }
+
+  .conflicto { margin: 0 -14px 48px; padding: 10px 14px; border-radius: 10px; border: 1px dashed var(--line-strong); font: 13px/1.45 var(--sans); display: flex; gap: 10px; align-items: flex-start; }
+  .conflicto .acc { display: flex; gap: 6px; margin-top: 8px; }
+
+  .nuevo { margin-top: 18px; display: flex; align-items: center; gap: 8px; color: var(--faint); font: 15px var(--serif); position: relative; }
+  .nuevo .barra { font-family: var(--mono); }
+
+  /* Inspector */
+  .inspector { border-left: 1px solid var(--line); background: var(--surface); padding: 22px 20px; display: flex; flex-direction: column; gap: 32px; position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .inspector h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  .inspector h3 .n { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); }
+  .tarjeta-v { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 12.5px; }
+  .tarjeta-v + .tarjeta-v { margin-top: 10px; }
+  .tarjeta-v.activa { border-color: var(--text); }
+  .tarjeta-v .cab { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); margin-bottom: 4px; }
+  .tarjeta-v .cab b { color: var(--text); font-weight: 600; }
+  .tarjeta-v .cab .d { margin-left: auto; }
+  .tarjeta-v p { margin: 0; font: 13.5px/1.55 var(--serif); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tarjeta-v .acc { display: flex; gap: 6px; margin-top: 8px; }
+  .tarjeta-v .acc .btn { height: 26px; padding: 0 9px; font-size: 12px; }
+
+  .ramas div.r { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 7px; font-size: 13px; }
+  .ramas div.r.sel { background: var(--surface-2); }
+  .ramas .r small { margin-left: auto; color: var(--faint); font-size: 12px; }
+
+  .linea { position: relative; padding-left: 16px; font-size: 12.5px; }
+  .linea::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
+  .linea div { position: relative; padding: 5px 0; color: var(--muted); }
+  .linea div::before { content: ""; position: absolute; left: -15px; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--line-strong); }
+  .linea div.ahora::before { background: var(--text); border-color: var(--text); }
+  .linea div b { color: var(--text); font-weight: 500; }
+
+  .estado { white-space: nowrap; position: fixed; left: 224px; right: 340px; bottom: 0; display: flex; gap: 16px; align-items: center; padding: 8px 20px; font-size: 12px; color: var(--faint); background: color-mix(in srgb, var(--bg) 90%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(8px); }
+  .estado .espacio { flex: 1; }
+
+  .idiomas { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; height: 32px; }
+  .idiomas span { display: grid; place-items: center; padding: 0 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .idiomas span.sel { background: var(--accent); color: var(--accent-text); }
+
+  svg.i { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; width: 16px; height: 16px; flex: none; }
+  svg.i.s { width: 14px; height: 14px; }
+  svg.f { fill: currentColor; stroke: none; }

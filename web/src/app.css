@@ -1,0 +1,53 @@
+/* Piezas de la app que no estaban en las maquetas: campos, menús, avisos,
+   ventanas de diálogo y los detalles del editor de TipTap. */
+
+input, textarea, select { font: inherit; color: inherit; }
+.campo {
+  height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); font-size: 13px; min-width: 0;
+}
+.campo:focus { outline: none; border-color: var(--line-strong); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 8%, transparent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, .item:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+button.chip { cursor: pointer; }
+
+/* Menús desplegables */
+.desplegable { position: relative; display: inline-flex; }
+.menu { top: calc(100% + 6px); left: 0; }
+.menu.der { left: auto; right: 0; }
+.menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; font-size: 13px; border: 0; background: transparent; cursor: pointer; text-align: left; }
+.menu button:hover, .menu button.sel { background: var(--surface-2); }
+.menu button small { margin-left: auto; color: var(--faint); }
+.menu .etq { padding: 6px 8px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); font-weight: 600; }
+
+/* Avisos */
+.avisos { position: fixed; z-index: 90; left: 50%; bottom: 52px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.avisos div { pointer-events: auto; max-width: 560px; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-text); font-size: 13px; box-shadow: var(--shadow); }
+.avisos div.error { background: var(--surface); color: var(--text); border: 1px solid var(--text); }
+
+/* Diálogo */
+.dialogo-velo { position: fixed; inset: 0; z-index: 80; background: rgb(0 0 0 / 0.35); display: grid; place-items: center; padding: 16px; }
+.dialogo { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px; }
+.dialogo h2 { margin: 0; font-size: 15px; }
+.dialogo p { margin: 0; color: var(--muted); font-size: 13px; }
+.dialogo .acc { display: flex; justify-content: flex-end; gap: 8px; }
+.dialogo .campo { height: 36px; font-size: 14px; }
+
+/* Editor: TipTap dentro de cada bloque */
+.bloque .ProseMirror { outline: none; white-space: pre-wrap; word-wrap: break-word; }
+.bloque .ProseMirror p { margin: 0; }
+.bloque .ProseMirror h3 { font: 600 18px/1.4 var(--serif); margin: 0; }
+.bloque .ProseMirror blockquote { margin: 0; padding-left: 16px; border-left: 3px solid var(--line-strong); color: var(--muted); }
+.bloque .ProseMirror blockquote p + p { margin-top: 10px; }
+.bloque .ProseMirror ul, .bloque .ProseMirror ol { margin: 0; padding-left: 24px; }
+.bloque .ProseMirror li + li { margin-top: 4px; }
+.bloque .ProseMirror code { font: 0.88em var(--mono); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+.bloque .ProseMirror a { text-decoration: underline; text-underline-offset: 3px; }
+.bloque .ProseMirror.vacio::before { content: attr(data-placeholder); position: absolute; color: var(--faint); pointer-events: none; }
+.cambio .tachado + .anadido { margin-left: 2px; }
+.nota-marca { display: inline-grid; place-items: center; vertical-align: 2px; margin: 0 2px; width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.nota-marca:hover { color: var(--text); border-color: var(--line-strong); }
+.anadido[data-ia], .tachado[data-ia] { text-decoration-style: dotted; }
+.ProseMirror-selectednode { outline: 2px solid var(--line-strong); border-radius: 4px; }
+
+.vacio-centro { padding: 80px 20px; text-align: center; color: var(--muted); }

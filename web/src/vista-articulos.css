@@ -1,0 +1,29 @@
+/* Copiado de diseno/web-articulos.html (maqueta aprobada). */
+.contenido { padding: 24px 28px 60px; max-width: 1180px; }
+  .filtros { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .pestanas { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 9px; }
+  .pestanas span { padding: 5px 11px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+  .pestanas span.sel { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); font-weight: 500; }
+  .pestanas span small { color: var(--faint); margin-left: 4px; }
+
+  .lista { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .fila { display: grid; grid-template-columns: minmax(0, 1fr) 150px 110px 150px 90px; gap: 16px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line); text-decoration: none; }
+  .fila:first-child { border-top: 0; }
+  .fila:hover { background: var(--surface-2); }
+  .fila.cab { font-size: 12px; color: var(--faint); padding-top: 10px; padding-bottom: 10px; background: var(--surface); }
+  .fila .t b { display: block; font: 600 16px/1.35 var(--serif); margin-bottom: 3px; }
+  .fila .t span { display: block; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fila .t .chips { display: flex; gap: 5px; margin-top: 7px; }
+  .fila .t .chips .chip { height: 20px; font-size: 11px; }
+  .idi { display: flex; gap: 4px; }
+  .idi span { font: 600 11px/1 var(--mono); padding: 4px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); }
+  .idi span.ok { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .idi span.ia { border-style: dashed; }
+  .prox { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .prox .vacio { color: var(--faint); }
+  .peq { font-size: 12px; color: var(--faint); }
+  .señales { display: flex; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 7px; }
+  .fila .t .señales span { display: inline-flex; align-items: center; gap: 4px; overflow: visible; }
+
+  .grupo-t { display: flex; align-items: center; gap: 10px; margin: 26px 0 10px; font-size: 13px; font-weight: 600; }
+  .grupo-t .chip { font-weight: 400; }

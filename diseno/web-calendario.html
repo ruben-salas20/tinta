@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinta · calendario</title>
+<link rel="icon" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="tema.js"></script>
+<link rel="stylesheet" href="estilos.css">
+<link rel="stylesheet" href="web.css">
+<style>
+  .cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+  .zona { padding: 18px 24px 40px; }
+  .barra { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .barra h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0 8px 0 4px; }
+  .pestanas { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 9px; }
+  .pestanas span { padding: 4px 11px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+  .pestanas span.sel { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); font-weight: 500; }
+  .filtro { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 6px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--surface); }
+  .filtro.off { opacity: 0.45; }
+
+  .semana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--faint); padding: 0 2px 6px; }
+  .mes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--line); gap: 1px; }
+  .dia { background: var(--surface); min-height: 118px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .dia.pasado { background: var(--bg); }
+  .dia .num { font-size: 12px; color: var(--muted); padding: 2px 4px; align-self: flex-start; }
+  .dia.hoy .num { background: var(--accent); color: var(--accent-text); border-radius: 99px; font-weight: 600; padding: 2px 8px; }
+  .dia .pub { align-items: flex-start; padding: 4px 5px; }
+  .dia .pub svg.red { width: 13px; height: 13px; margin-top: 1px; }
+  .dia .pub span.t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 11.5px; }
+  .dia .pub.publicada::after { margin-top: 1px; }
+  .dia .pub.sel { box-shadow: 0 0 0 2px var(--text); }
+
+  .leyenda { display: flex; gap: 14px; margin-top: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .leyenda .pub { width: 110px; }
+
+  .detalle { border-left: 1px solid var(--line); background: var(--surface); padding: 18px; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .detalle .cab { display: flex; align-items: center; gap: 8px; }
+  .detalle .cab b { font-size: 15px; }
+  .campos { display: grid; grid-template-columns: 70px 1fr; gap: 8px 10px; font-size: 13px; align-items: center; }
+  .campos dt { color: var(--faint); }
+  .campos dd { margin: 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .estados { display: flex; gap: 4px; }
+  .estados span { font-size: 11.5px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+  .estados span.sel { border-color: var(--e); background: color-mix(in srgb, var(--e) 14%, var(--surface)); color: var(--text); font-weight: 500; }
+
+  .post { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.5; position: relative; }
+  .post + .post { margin-top: 8px; }
+  .post .pie { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+  .post .pie .cuenta { margin-left: auto; font-family: var(--mono); }
+  .post .pie .cuenta.pasa { color: var(--text); font-weight: 600; }
+  .post.pasa { border-color: var(--text); }
+  .barra-uso { height: 3px; background: var(--surface-3); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .barra-uso i { display: block; height: 100%; background: var(--muted); }
+  .post.pasa .barra-uso i { background: var(--text); }
+  .medios { display: flex; gap: 6px; margin-top: 8px; }
+  .medios span { width: 52px; height: 52px; border-radius: 8px; background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--surface-3) 6px 12px); }
+  h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; display: flex; }
+  h4 small { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); }
+  .aviso { font-size: 12px; color: var(--muted); padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="lateral">
+    <a class="logo" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg>Tinta</a>
+    <a class="item" href="web-articulos.html"><svg class="i"><use href="iconos.svg#articulos"/></svg>Artículos<span class="n">12</span></a>
+    <a class="item activo" href="web-calendario.html"><svg class="i"><use href="iconos.svg#calendario"/></svg>Calendario<span class="n">7</span></a>
+    <div class="grupo">Canales</div>
+    <a class="item" href="#"><svg class="red"><use href="redes.svg#x"/></svg>X</a>
+    <a class="item" href="#"><svg class="red"><use href="redes.svg#linkedin"/></svg>LinkedIn</a>
+    <a class="item" href="#"><svg class="red"><use href="redes.svg#instagram"/></svg>Instagram</a>
+    <a class="item" href="#"><svg class="red"><use href="redes.svg#portfolio"/></svg>Portfolio</a>
+    <a class="item" href="#" style="color:var(--faint)"><svg class="red"><use href="redes.svg#youtube"/></svg>YouTube<span class="n">pronto</span></a>
+    <a class="item" href="#" style="color:var(--faint)"><svg class="red"><use href="redes.svg#tiktok"/></svg>TikTok<span class="n">pronto</span></a>
+    <a class="item" href="#" style="color:var(--faint)"><svg class="i"><use href="iconos.svg#mas"/></svg>Añadir canal</a>
+    <div class="pie">
+      <span style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#nube"/></svg>Sincronizado (5 min)</span>
+    </div>
+  </nav>
+
+  <div>
+    <header class="cabecera">
+      <h1>Calendario</h1>
+      <div class="espacio"></div>
+      <div class="buscar"><svg class="i s"><use href="iconos.svg#buscar"/></svg>Buscar publicaciones</div>
+      <button class="btn primario"><svg class="i"><use href="iconos.svg#mas"/></svg>Nueva publicación</button>
+    </header>
+
+    <div class="cuerpo">
+      <div class="zona">
+        <div class="barra">
+          <button class="btn" style="padding:0 7px"><svg class="i"><use href="iconos.svg#izq"/></svg></button>
+          <button class="btn">Hoy</button>
+          <button class="btn" style="padding:0 7px"><svg class="i"><use href="iconos.svg#der"/></svg></button>
+          <h2>Octubre – noviembre 2026</h2>
+          <div class="pestanas"><span class="sel">Mes</span><span>Semana</span><span>Lista</span></div>
+          <span style="flex:1"></span>
+        </div>
+        <div class="semana"><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span></div>
+        <div class="mes">
+<div class="dia pasado"><span class="num">19 oct</span></div>
+<div class="dia pasado"><span class="num">20</span><div class="pub publicada"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">Por qué monté una torre en casa</span></div></div>
+<div class="dia pasado"><span class="num">21</span></div>
+<div class="dia pasado"><span class="num">22</span><div class="pub publicada"><svg class="red"><use href="redes.svg#linkedin"/></svg><span class="t">Montando ai-lab: el hardware</span></div></div>
+<div class="dia pasado"><span class="num">23</span><div class="pub publicada"><svg class="red"><use href="redes.svg#portfolio"/></svg><span class="t">Montando ai-lab, parte 1</span></div></div>
+<div class="dia pasado"><span class="num">24</span></div>
+<div class="dia pasado"><span class="num">25</span></div>
+<div class="dia hoy"><span class="num">26</span><div class="pub programada"><svg class="red"><use href="redes.svg#instagram"/></svg><span class="t">Carrusel: la escena pixel art</span></div></div>
+<div class="dia"><span class="num">27</span><div class="pub preparando"><svg class="red"><use href="redes.svg#linkedin"/></svg><span class="t">Lo que cambió al dirigir agentes</span></div></div>
+<div class="dia"><span class="num">28</span></div>
+<div class="dia"><span class="num">29</span><div class="pub programada"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">X Article: dirigir agentes</span></div></div>
+<div class="dia"><span class="num">30</span><div class="pub idea"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">Post: una pregunta sobre MCP</span></div></div>
+<div class="dia"><span class="num">31</span></div>
+<div class="dia"><span class="num">1 nov</span></div>
+<div class="dia"><span class="num">2</span><div class="pub programada"><svg class="red"><use href="redes.svg#portfolio"/></svg><span class="t">llama-swap: un contenedor…</span></div><div class="pub preparando sel"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">Hilo: llama-swap en 4 posts</span></div></div>
+<div class="dia"><span class="num">3</span><div class="pub idea"><svg class="red"><use href="redes.svg#linkedin"/></svg><span class="t">Artículo: llama-swap</span></div></div>
+<div class="dia"><span class="num">4</span></div>
+<div class="dia"><span class="num">5</span><div class="pub idea"><svg class="red"><use href="redes.svg#instagram"/></svg><span class="t">Reel: la torre por dentro</span></div></div>
+<div class="dia"><span class="num">6</span></div>
+<div class="dia"><span class="num">7</span></div>
+<div class="dia"><span class="num">8</span></div>
+<div class="dia"><span class="num">9</span><div class="pub programada"><svg class="red"><use href="redes.svg#portfolio"/></svg><span class="t">Atalaya: leer el mundo…</span></div></div>
+<div class="dia"><span class="num">10</span><div class="pub idea"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">Hilo: Atalaya</span></div></div>
+<div class="dia"><span class="num">11</span></div>
+<div class="dia"><span class="num">12</span><div class="pub idea"><svg class="red"><use href="redes.svg#linkedin"/></svg><span class="t">Post: Atalaya</span></div></div>
+<div class="dia"><span class="num">13</span></div>
+<div class="dia"><span class="num">14</span></div>
+<div class="dia"><span class="num">15</span></div>
+<div class="dia"><span class="num">16</span></div>
+<div class="dia"><span class="num">17</span><div class="pub idea"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">Post: copias de seguridad</span></div></div>
+<div class="dia"><span class="num">18</span></div>
+<div class="dia"><span class="num">19</span></div>
+<div class="dia"><span class="num">20</span></div>
+<div class="dia"><span class="num">21</span></div>
+<div class="dia"><span class="num">22</span></div>
+        </div>
+        <div class="leyenda">
+          <div class="pub idea"><span class="t">Idea</span></div>
+          <div class="pub preparando"><span class="t">Preparando</span></div>
+          <div class="pub programada"><span class="t">Programada</span></div>
+          <div class="pub publicada"><span class="t">Publicada</span></div>
+          <span>Arrastra una publicación a otro día para moverla.</span>
+        </div>
+      </div>
+
+      <aside class="detalle">
+        <div class="cab"><svg class="red"><use href="redes.svg#x"/></svg><b>Hilo: llama-swap en 4 posts</b><span style="flex:1"></span><button class="btn fantasma" style="padding:0 6px"><svg class="i"><use href="iconos.svg#puntos"/></svg></button></div>
+        <dl class="campos">
+          <dt>Fecha</dt><dd>Lun 2 nov · 18:00</dd>
+          <dt>Formato</dt><dd><span class="chip">Hilo</span></dd>
+          <dt>Estado</dt><dd class="estados"><span class="e-idea">Idea</span><span class="sel e-preparando">Preparando</span><span class="e-programada">Programada</span><span class="e-publicada">Publicada</span></dd>
+          <dt>Artículo</dt><dd><a href="web-editor.html" style="display:flex;gap:6px;align-items:center"><svg class="i s"><use href="iconos.svg#articulos"/></svg>llama-swap: un contenedor…</a></dd>
+        </dl>
+
+        <div>
+          <h4>Posts del hilo <small>límite 280 por post</small></h4>
+          <div class="post">
+            Tenía un contenedor por cada modelo de IA en mi torre. Con 6 GB de VRAM solo cabía uno a la vez, y yo hacía de semáforo.
+            <div class="barra-uso"><i style="width:47%"></i></div>
+            <div class="pie">1 / 4<span class="cuenta">131 / 280</span></div>
+          </div>
+          <div class="post">
+            llama-swap arranca el modelo que pide cada petición y apaga el anterior. Cuando pasan cinco minutos sin uso, la GPU queda libre sola.
+            <div class="medios"><span></span></div>
+            <div class="barra-uso"><i style="width:48%"></i></div>
+            <div class="pie">2 / 4 · 1 imagen<span class="cuenta">134 / 280</span></div>
+          </div>
+          <div class="post pasa">
+            Lo que no esperaba: como ya no pienso en qué está encendido, pruebo modelos nuevos mucho más a menudo. Añadir uno son cinco líneas de YAML. Antes era una tarde entera de pelearme con Docker, puertos, volúmenes y la memoria de la tarjeta gráfica, y casi siempre lo dejaba para otro día.
+            <div class="barra-uso"><i style="width:100%"></i></div>
+            <div class="pie">3 / 4<span class="cuenta pasa">297 / 280</span></div>
+          </div>
+          <div class="post">
+            Lo escribí entero, con la configuración, en mi web: rubensalas.dev/articulos/llama-swap
+            <div class="barra-uso"><i style="width:30%"></i></div>
+            <div class="pie">4 / 4 · enlace<span class="cuenta">84 / 280</span></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <button class="btn"><svg class="i s"><use href="iconos.svg#mas"/></svg>Post</button>
+            <button class="btn">Partir el 3 en dos</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn"><svg class="i s"><use href="iconos.svg#copiar"/></svg>Copiar post 1</button>
+          <button class="btn primario"><svg class="i s"><use href="iconos.svg#check"/></svg>Marcar publicada</button>
+        </div>
+        <div class="aviso">Al marcarla publicada, Tinta te pide el enlace del post para guardarlo. Tinta no publica por ti.</div>
+      </aside>
+    </div>
+  </div>
+</div>
+</body>
+</html>

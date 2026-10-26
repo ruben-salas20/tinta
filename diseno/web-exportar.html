@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinta · exportar</title>
+<link rel="icon" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="tema.js"></script>
+<link rel="stylesheet" href="estilos.css">
+<style>
+  body { overflow: hidden; }
+  iframe.fondo { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  .velo { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); backdrop-filter: blur(2px); display: grid; place-items: center; padding: 24px; }
+  .ventana { width: min(1040px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+  .v-cab { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .v-cab b { font-size: 15px; }
+  .v-cab span { color: var(--muted); }
+  .v-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .col { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .col + .col { border-left: 1px solid var(--line); }
+  h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  h3 + p { margin: -10px 0 0; color: var(--muted); font-size: 13px; }
+  .opciones { display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; font-size: 13px; align-items: center; }
+  .opciones dt { color: var(--faint); }
+  .opciones dd { margin: 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .caja { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--line-strong); }
+  .caja.si { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .interruptor { width: 30px; height: 18px; border-radius: 99px; background: var(--surface-3); position: relative; }
+  .interruptor::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); }
+  .arbol { font: 12.5px/1.75 var(--mono); padding: 12px 14px; background: var(--surface-2); border-radius: 10px; white-space: pre; overflow-x: auto; }
+  .arbol .d { color: var(--faint); }
+  .revision { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .revision div { display: flex; gap: 8px; align-items: flex-start; }
+  .revision .mal { font-weight: 500; }
+  .revision svg { margin-top: 2px; }
+  pre.fm { margin: 0; white-space: pre-wrap; font: 12.5px/1.6 var(--mono); padding: 12px 14px; background: var(--surface-2); border-radius: 10px; overflow-x: auto; }
+  .vista-x { border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; font-family: system-ui, sans-serif; }
+  .vista-x h4 { font-size: 22px; line-height: 1.2; margin: 0 0 12px; font-weight: 800; }
+  .vista-x h5 { font-size: 17px; margin: 14px 0 6px; font-weight: 700; }
+  .vista-x p { margin: 0 0 8px; font-size: 14.5px; line-height: 1.5; }
+  .vista-x .hueco { display: flex; align-items: center; gap: 8px; justify-content: center; height: 70px; border: 1.5px dashed var(--line-strong); border-radius: 10px; color: var(--muted); font-size: 12.5px; margin: 8px 0; }
+  .vista-x .sigue { color: var(--faint); font-size: 13px; }
+  .v-pie { display: flex; gap: 8px; }
+  .v-pie .espacio { flex: 1; }
+</style>
+</head>
+<body>
+<iframe class="fondo" src="web-editor.html" tabindex="-1" aria-hidden="true"></iframe>
+<script>document.querySelector(".fondo").src = "web-editor.html" + location.hash;</script>
+<div class="velo">
+  <div class="ventana">
+    <div class="v-cab">
+      <b>Exportar y copiar</b><span>llama-swap: un contenedor para todos mis modelos</span>
+      <span style="flex:1"></span>
+      <button class="btn fantasma" style="padding:0 6px"><svg class="i"><use href="iconos.svg#x"/></svg></button>
+    </div>
+    <div class="v-cuerpo">
+      <section class="col">
+        <h3><svg class="red"><use href="redes.svg#portfolio"/></svg>Para el portfolio</h3>
+        <p>Un .zip para descomprimir en la raíz del repo del portfolio.</p>
+        <dl class="opciones">
+          <dt>Idiomas</dt>
+          <dd><span class="caja si"><svg class="i s"><use href="iconos.svg#check"/></svg></span>ES <span style="width:10px"></span><span class="caja"></span><span style="color:var(--faint)">EN · propuesta sin revisar</span></dd>
+          <dt>Rama</dt><dd><span class="chip"><svg class="i s"><use href="iconos.svg#rama"/></svg>principal</span></dd>
+          <dt>Fecha</dt><dd>2026-11-02 <span style="color:var(--faint)">· sale del calendario</span></dd>
+          <dt>Borrador</dt><dd><span class="interruptor"></span><span style="color:var(--faint)">draft: false, se publica</span></dd>
+        </dl>
+        <div class="arbol"><span class="d">tinta-llama-swap.zip</span>
+├─ src/content/articles/llama-swap/
+│  ├─ es.md
+│  └─ vram-en-reposo.png
+└─ public/articulos/llama-swap/
+   └─ resumen-en-voz.mp3</div>
+        <div class="revision">
+          <div><svg class="i s"><use href="iconos.svg#check"/></svg>Se quitan 2 tachados, 1 nota y 1 propuesta sin aceptar.</div>
+          <div><svg class="i s"><use href="iconos.svg#check"/></svg>Todas las imágenes tienen texto alternativo.</div>
+          <div class="mal"><svg class="i s"><use href="iconos.svg#rama"/></svg>1 conflicto sin resolver en «Lo que aprendí». Se exporta la variante activa.</div>
+        </div>
+        <pre class="fm">---
+title: "llama-swap: un contenedor para todos mis modelos"
+description: Cómo dejé de tener un servicio por modelo y por qué la GPU ahora descansa cuando no la uso.
+date: 2026-11-02
+---</pre>
+        <div class="v-pie">
+          <button class="btn"><svg class="i s"><use href="iconos.svg#copiar"/></svg>Copiar Markdown</button>
+          <span class="espacio"></span>
+          <button class="btn primario"><svg class="i s"><use href="iconos.svg#descargar"/></svg>Descargar .zip</button>
+        </div>
+      </section>
+
+      <section class="col">
+        <h3><svg class="red"><use href="redes.svg#x"/></svg>Para X Articles</h3>
+        <p>Copia el texto con formato. Pégalo en el editor de X Articles.</p>
+        <div class="vista-x">
+          <h4>llama-swap: un contenedor para todos mis modelos</h4>
+          <h5>Por qué no un contenedor por modelo</h5>
+          <p>Al principio cada modelo tenía su propio contenedor. Funcionaba, pero con 6 GB de VRAM solo cabía uno encendido a la vez…</p>
+          <div class="hueco"><svg class="i s"><use href="iconos.svg#imagen"/></svg>Aquí va vram-en-reposo.png: súbela a mano en X</div>
+          <p class="sigue">… y 4 bloques más</p>
+        </div>
+        <div class="revision">
+          <div class="mal"><svg class="i s"><use href="iconos.svg#imagen"/></svg>1 imagen: X no la recibe al pegar. Tinta deja un hueco con su nombre.</div>
+          <div><svg class="i s"><use href="iconos.svg#audio"/></svg>El audio se omite: X Articles no admite audio.</div>
+          <div><svg class="i s"><use href="iconos.svg#play"/></svg>El vídeo de YouTube va como enlace.</div>
+          <div style="color:var(--muted)"><svg class="i s"><use href="iconos.svg#nota"/></svg>Pendiente de probar en la fase 1: si X conserva el bloque de código.</div>
+        </div>
+        <div class="v-pie">
+          <button class="btn"><svg class="i s"><use href="iconos.svg#descargar"/></svg>Bajar la imagen</button>
+          <span class="espacio"></span>
+          <button class="btn primario"><svg class="i s"><use href="iconos.svg#copiar"/></svg>Copiar para X</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>

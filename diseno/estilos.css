@@ -1,0 +1,130 @@
+/* Tinta · maquetas. Solo grises, negro y blanco; el tema sigue al sistema. */
+:root {
+  --bg: #f4f4f4;
+  --surface: #ffffff;
+  --surface-2: #efefef;
+  --surface-3: #e6e6e6;
+  --line: #e0e0e0;
+  --line-strong: #c9c9c9;
+  --text: #121212;
+  --muted: #666666;
+  --faint: #9b9b9b;
+  --accent: #121212;
+  --accent-text: #ffffff;
+  --mark-add: #e4e4e4;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+  --e-idea: #878787; --e-ambar: #c27c0e; --e-violeta: #7452d6; --e-azul: #1f6fd1; --e-verde: #1c9152;
+  --sans: "Inter", system-ui, sans-serif;
+  --serif: "Source Serif 4", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0c0c;
+    --surface: #161616;
+    --surface-2: #1d1d1d;
+    --surface-3: #262626;
+    --line: #2a2a2a;
+    --line-strong: #3a3a3a;
+    --text: #ececec;
+    --muted: #9a9a9a;
+    --faint: #6a6a6a;
+    --accent: #ececec;
+    --accent-text: #111111;
+    --mark-add: #2e2e2e;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.4);
+    --e-idea: #8f8f8f; --e-ambar: #eeab3a; --e-violeta: #ae95ff; --e-azul: #5fa6ff; --e-verde: #4ccf86;
+  }
+}
+:root[data-theme="dark"] {
+    --bg: #0c0c0c;
+    --surface: #161616;
+    --surface-2: #1d1d1d;
+    --surface-3: #262626;
+    --line: #2a2a2a;
+    --line-strong: #3a3a3a;
+    --text: #ececec;
+    --muted: #9a9a9a;
+    --faint: #6a6a6a;
+    --accent: #ececec;
+    --accent-text: #111111;
+    --mark-add: #2e2e2e;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.4);
+    --e-idea: #8f8f8f; --e-ambar: #eeab3a; --e-violeta: #ae95ff; --e-azul: #5fa6ff; --e-verde: #4ccf86;
+  }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+
+/* --- Piezas comunes --- */
+.logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.01em; text-decoration: none; }
+.logo svg { width: 22px; height: 22px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); cursor: pointer; white-space: nowrap;
+  font-size: 13px;
+}
+.btn:hover { border-color: var(--line-strong); }
+.btn.primario { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.btn.fantasma { border-color: transparent; background: transparent; }
+.btn svg { width: 15px; height: 15px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 8px; border-radius: 99px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.chip.lleno { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.chip.punto::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.ia { font: 600 10px/1 var(--mono); padding: 3px 5px; border-radius: 4px; border: 1px solid var(--line-strong); color: var(--muted); letter-spacing: 0.04em; }
+
+.kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
+
+.icono { width: 16px; height: 16px; flex: none; }
+
+/* Marcas de revisión (CriticMarkup en pantalla) */
+.tachado { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--faint); }
+.anadido { background: var(--mark-add); text-decoration: underline dotted var(--muted); text-underline-offset: 3px; border-radius: 3px; padding: 0 2px; }
+.nota-ancla { border-bottom: 2px solid var(--line-strong); }
+
+/* Canales: el icono de cada red, en el color del texto */
+svg.red { width: 15px; height: 15px; flex: none; fill: currentColor; }
+svg.red.g { width: 18px; height: 18px; }
+
+/* Estados: una escala de color apagada, lo único con color en Tinta.
+   Artículos: idea, borrador, revisión, listo, publicado.
+   Publicaciones: idea, preparando, programada, publicada. */
+.e-idea { --e: var(--e-idea); }
+.e-borrador, .e-preparando, .pub.preparando { --e: var(--e-ambar); }
+.e-revision { --e: var(--e-violeta); }
+.e-listo, .e-programada, .pub.programada { --e: var(--e-azul); }
+.e-publicado, .e-publicada, .pub.publicada { --e: var(--e-verde); }
+.pub.idea { --e: var(--e-idea); }
+.chip.punto::before { background: var(--e, currentColor); }
+.chip:is([class^="e-"], [class*=" e-"]) { color: var(--text); border-color: color-mix(in srgb, var(--e) 35%, var(--line)); background: color-mix(in srgb, var(--e) 10%, var(--surface)); }
+
+.pub { display: flex; align-items: center; gap: 6px; padding: 3px 6px 3px 7px; border-radius: 6px; font-size: 12px; line-height: 1.3; overflow: hidden; border-left: 3px solid var(--e); background: color-mix(in srgb, var(--e) 9%, var(--surface)); }
+.pub span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub.idea { color: var(--muted); background: transparent; border: 1px dashed var(--line-strong); border-left: 3px solid var(--e); }
+.pub.programada { background: color-mix(in srgb, var(--e) 16%, var(--surface)); }
+.pub.publicada { color: var(--faint); background: transparent; }
+.pub.publicada::after { content: "✓"; margin-left: auto; color: var(--e); }
+
+/* Iconos del archivo iconos.svg */
+svg.i { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; width: 16px; height: 16px; flex: none; }
+svg.i.s { width: 14px; height: 14px; }
+svg.f { fill: currentColor; stroke: none; }

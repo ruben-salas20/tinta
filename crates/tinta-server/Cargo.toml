@@ -1,0 +1,30 @@
+[package]
+name = "tinta-server"
+description = "Servicio de Tinta: artículos, calendario y MCP"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum = { version = "0.8.9", features = ["multipart", "macros"] }
+chrono = "0.4.45"
+getrandom = "0.4.3"
+hex = "0.4.3"
+mime = "0.3.17"
+pulldown-cmark = "0.13.5"
+rusqlite = { version = "0.41.0", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+subtle = "2.6.1"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "sync", "fs"] }
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.7.1", features = ["fs", "trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+zip = { version = "9.1.1", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }

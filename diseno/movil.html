@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinta · Android</title>
+<link rel="icon" href="logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="tema.js"></script>
+<link rel="stylesheet" href="estilos.css">
+<style>
+  .lienzo { padding: 32px 24px 64px; }
+  .lienzo > header { max-width: 1600px; margin: 0 auto 28px; display: flex; align-items: center; gap: 12px; }
+  .lienzo > header h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .lienzo > header a { color: var(--muted); font-size: 13px; }
+  .rejilla { display: flex; flex-wrap: wrap; gap: 36px 28px; justify-content: center; max-width: 1600px; margin: 0 auto; }
+  figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  figcaption { font-size: 13px; color: var(--muted); max-width: 360px; }
+  figcaption b { color: var(--text); display: block; font-size: 14px; }
+
+  .tel { position: relative; width: 360px; height: 780px; border-radius: 42px; border: 9px solid #0a0a0a; background: var(--bg); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 0 0 1px var(--line-strong), var(--shadow); }
+  .sb { flex: none; height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 12px; font-weight: 600; }
+  .sb .cam { width: 10px; height: 10px; border-radius: 50%; background: #0a0a0a; position: absolute; left: 50%; top: 11px; transform: translateX(-50%); }
+  .barra-sup { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 16px 10px; }
+  .barra-sup h2 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+  .barra-sup .t { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barra-sup .espacio { flex: 1; }
+  .ic { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .ic svg.i { width: 20px; height: 20px; }
+  .scroll { flex: 1; overflow: hidden; padding: 0 16px; }
+  .nav { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 6px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+  .nav div { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+  .nav div span.p { width: 56px; height: 30px; border-radius: 99px; display: grid; place-items: center; }
+  .nav div.sel { color: var(--text); font-weight: 600; }
+  .nav div.sel span.p { background: var(--surface-3); }
+  .nav svg.i { width: 20px; height: 20px; }
+  .fab { position: absolute; right: 18px; bottom: 92px; width: 56px; height: 56px; border-radius: 18px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; box-shadow: var(--shadow); }
+  .fab svg.i { width: 22px; height: 22px; }
+
+  .banda { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 9px 12px; border-radius: 12px; background: var(--surface-2); color: var(--muted); margin-bottom: 14px; }
+  .banda b { color: var(--text); font-weight: 600; }
+  .tarjeta { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .tarjeta + .tarjeta { margin-top: 10px; }
+  .etq { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); font-weight: 600; margin: 18px 2px 8px; }
+  .resumen { display: grid; grid-template-columns: 1fr 1fr 1fr; text-align: left; gap: 8px; }
+  .resumen div b { display: block; font-size: 26px; letter-spacing: -0.02em; line-height: 1.1; }
+  .resumen div span { font-size: 12px; color: var(--muted); }
+  .agenda .d { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .agenda .d:first-child { border-top: 0; padding-top: 2px; }
+  .agenda .fecha { width: 38px; flex: none; text-align: center; }
+  .agenda .fecha b { display: block; font-size: 18px; line-height: 1.1; }
+  .agenda .fecha span { font-size: 11px; color: var(--faint); text-transform: uppercase; }
+  .agenda .items { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .agenda .pub { font-size: 13px; padding: 6px 8px; }
+  .agenda .pub small { margin-left: auto; color: var(--faint); flex: none; }
+  .seguir b { font: 600 16px/1.3 var(--serif); display: block; margin: 4px 0; }
+  .seguir span { font-size: 12.5px; color: var(--muted); }
+  .seguir .prog { height: 4px; background: var(--surface-3); border-radius: 2px; margin-top: 10px; }
+  .seguir .prog i { display: block; width: 62%; height: 100%; background: var(--text); border-radius: 2px; }
+
+  .buscar { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px; border-radius: 99px; background: var(--surface-2); color: var(--faint); font-size: 14px; margin-bottom: 12px; }
+  .chips { display: flex; gap: 6px; overflow: hidden; margin-bottom: 12px; }
+  .chips .chip { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
+  .chips .chip.sel { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .art b { font: 600 16px/1.3 var(--serif); display: block; }
+  .art p { margin: 4px 0 10px; font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .art .fila { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .art .fila .chip { height: 22px; }
+  .art .fila .der { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+  /* Editor móvil */
+  .ed { padding: 0 20px; }
+  .ed .serie { font-size: 12px; color: var(--faint); margin: 4px 0 6px; }
+  .ed h1 { font: 600 26px/1.18 var(--serif); margin: 0 0 16px; letter-spacing: -0.01em; }
+  .ed h2 { font: 600 20px/1.3 var(--serif); margin: 18px 0 8px; }
+  .ed p { font: 16.5px/1.65 var(--serif); margin: 0 0 12px; }
+  .ed .foco { margin: 0 -10px 12px; padding: 8px 10px; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1.5px var(--text); }
+  .ed .foco p { margin: 0; }
+  .selvar { display: flex; align-items: center; gap: 6px; margin-top: 8px; font: 12px var(--sans); color: var(--muted); }
+  .selvar .chip { height: 26px; }
+  .herram { flex: none; display: flex; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--line); background: var(--surface); overflow: hidden; }
+  .herram div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--muted); min-width: 52px; padding: 4px 2px; border-radius: 10px; }
+  .herram div.sel { background: var(--surface-3); color: var(--text); }
+  .herram svg.i { width: 19px; height: 19px; }
+  .teclado { flex: none; height: 196px; background: var(--surface-2); display: grid; grid-template-rows: repeat(4, 1fr); gap: 7px; padding: 10px 5px 14px; }
+  .teclado div { display: flex; gap: 5px; justify-content: center; }
+  .teclado span { flex: 1; max-width: 31px; border-radius: 6px; background: var(--surface); display: grid; place-items: center; font-size: 15px; color: var(--muted); }
+  .teclado .esp { max-width: 170px; }
+
+  /* Hojas inferiores */
+  .sombra { position: absolute; inset: 0; background: rgb(0 0 0 / 0.4); }
+  .hoja { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 26px 26px 0 0; padding: 10px 18px 22px; box-shadow: var(--shadow); }
+  .hoja .asa { width: 36px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 0 auto 14px; }
+  .hoja h3 { margin: 0 0 4px; font-size: 17px; }
+  .hoja .sub { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+  .var { border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .var + .var { margin-top: 8px; }
+  .var.activa { border-color: var(--text); }
+  .var .cab { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); margin-bottom: 5px; }
+  .var .cab b { color: var(--text); }
+  .var .cab .d { margin-left: auto; }
+  .var p { margin: 0; font: 14.5px/1.5 var(--serif); }
+  .var .acc { display: flex; gap: 6px; margin-top: 10px; }
+  .btn.g { height: 40px; padding: 0 16px; border-radius: 99px; font-size: 14px; }
+  .dif .tachado { color: var(--faint); }
+  .acciones { display: flex; gap: 8px; margin-top: 14px; }
+  .acciones .btn { flex: 1; justify-content: center; }
+  .acciones[style*="column"] .btn { flex: none; }
+
+  .post { border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 14px; line-height: 1.5; background: var(--surface); }
+  .post + .post { margin-top: 8px; }
+  .post .pie { display: flex; font-size: 12px; color: var(--faint); margin-top: 8px; }
+  .post .pie span:last-child { margin-left: auto; font-family: var(--mono); }
+  .post.pasa { border-color: var(--text); }
+  .post.pasa .pie span:last-child { color: var(--text); font-weight: 600; }
+  .campo { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .campo:first-child { border-top: 0; }
+  .campo span:first-of-type { color: var(--faint); width: 74px; font-size: 13px; }
+  .campo .der { margin-left: auto; color: var(--faint); }
+
+  /* Pantalla de bloqueo */
+  .bloqueo { background: linear-gradient(180deg, #2b2b2b, #0d0d0d); color: #f2f2f2; }
+  .bloqueo .sb { color: #f2f2f2; }
+  .reloj { text-align: center; margin-top: 70px; }
+  .reloj b { display: block; font-size: 76px; font-weight: 300; letter-spacing: -0.03em; line-height: 1; }
+  .reloj span { font-size: 15px; color: #bdbdbd; }
+  .notif { margin: 56px 12px 0; background: rgb(255 255 255 / 0.12); backdrop-filter: blur(20px); border-radius: 22px; padding: 14px 16px; color: #f2f2f2; }
+  .notif .cab { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c8c8c8; margin-bottom: 6px; }
+  .notif .cab svg { width: 16px; height: 16px; }
+  .notif b { font-size: 15px; display: block; margin-bottom: 4px; }
+  .notif ul { margin: 0; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.6; color: #e0e0e0; }
+  .notif ul li { display: flex; gap: 8px; align-items: center; }
+  .notif .canal { background: #f2f2f2; color: #111; }
+  .notif .canal.portfolio { background: transparent; border-color: #f2f2f2; color: #f2f2f2; }
+  .notif .acc { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; font-weight: 600; color: #f2f2f2; }
+</style>
+</head>
+<body>
+<div class="lienzo">
+  <header>
+    <a class="logo" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg></a>
+    <h1>Tinta para Android</h1>
+    <a href="index.html">← todas las maquetas</a>
+  </header>
+
+  <div class="rejilla">
+
+    <!-- 1. Hoy -->
+    <figure>
+      <div class="tel">
+        <div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 82%</span></div>
+        <div class="barra-sup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px"><use href="logo.svg#t"/></svg>
+          <h2>Hoy</h2><span class="espacio"></span>
+          <span class="ic"><svg class="i"><use href="iconos.svg#buscar"/></svg></span>
+        </div>
+        <div class="scroll">
+          <div class="banda"><svg class="i s"><use href="iconos.svg#sinred"/></svg><span><b>Sin conexión.</b> 3 cambios esperando; se envían solos.</span></div>
+          <div class="tarjeta">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Lunes 26 de octubre</div>
+            <div class="resumen">
+              <div><b>1</b><span>para hoy</span></div>
+              <div><b>0</b><span>atrasadas</span></div>
+              <div><b>6</b><span>esta semana</span></div>
+            </div>
+          </div>
+          <div class="etq">Próximos días</div>
+          <div class="tarjeta agenda">
+            <div class="d"><div class="fecha"><b>26</b><span>lun</span></div><div class="items"><div class="pub programada"><svg class="red"><use href="redes.svg#instagram"/></svg><span class="t">Carrusel: la escena pixel art</span><small>12:00</small></div></div></div>
+            <div class="d"><div class="fecha"><b>27</b><span>mar</span></div><div class="items"><div class="pub preparando"><svg class="red"><use href="redes.svg#linkedin"/></svg><span class="t">Lo que cambió al dirigir agentes</span><small>9:00</small></div></div></div>
+            <div class="d"><div class="fecha"><b>29</b><span>jue</span></div><div class="items"><div class="pub programada"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">X Article: dirigir agentes</span><small>18:00</small></div></div></div>
+            <div class="d"><div class="fecha"><b>30</b><span>vie</span></div><div class="items"><div class="pub idea"><svg class="red"><use href="redes.svg#x"/></svg><span class="t">Post: una pregunta sobre MCP</span></div></div></div>
+          </div>
+          <div class="etq">Seguir escribiendo</div>
+          <div class="tarjeta seguir">
+            <span>Borrador · Montando ai-lab · 2</span>
+            <b>llama-swap: un contenedor para todos mis modelos</b>
+            <span>612 palabras · 2 propuestas del agente</span>
+            <div class="prog"><i></i></div>
+          </div>
+        </div>
+        <span class="fab"><svg class="i"><use href="iconos.svg#mas"/></svg></span>
+        <div class="nav">
+          <div class="sel"><span class="p"><svg class="i"><use href="iconos.svg#hoy"/></svg></span>Hoy</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#articulos"/></svg></span>Artículos</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#calendario"/></svg></span>Calendario</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#ajustes"/></svg></span>Ajustes</div>
+        </div>
+      </div>
+      <figcaption><b>1 · Hoy</b>Lo que toca publicar y lo último que escribías. La banda de arriba solo aparece sin conexión.</figcaption>
+    </figure>
+
+    <!-- 2. Artículos -->
+    <figure>
+      <div class="tel">
+        <div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 82%</span></div>
+        <div class="barra-sup"><h2>Artículos</h2><span class="espacio"></span><span class="ic"><svg class="i"><use href="iconos.svg#ajustes"/></svg></span></div>
+        <div class="scroll">
+          <div class="buscar"><svg class="i"><use href="iconos.svg#buscar"/></svg>Buscar en títulos y texto</div>
+          <div class="chips"><span class="chip sel">Todos</span><span class="chip">Ideas</span><span class="chip">Borradores</span><span class="chip">Revisión</span><span class="chip">Listos</span></div>
+          <div class="tarjeta art">
+            <b>llama-swap: un contenedor para todos mis modelos</b>
+            <p>Cómo dejé de tener un servicio por modelo y por qué la GPU ahora descansa cuando no la uso.</p>
+            <div class="fila"><span class="chip punto e-borrador">Borrador</span><span>ai-lab · 2</span><span class="der"><svg class="i s"><use href="iconos.svg#agente"/></svg>2<svg class="i s"><use href="iconos.svg#rama"/></svg>1</span></div>
+          </div>
+          <div class="tarjeta art">
+            <b>Lo que aprendí dirigiendo agentes durante un mes</b>
+            <p>Qué cambió en cómo pido las cosas, y qué sigo haciendo mal.</p>
+            <div class="fila"><span class="chip punto e-revision">Revisión</span><span>Dirigir agentes · 1</span><span class="der"><svg class="red"><use href="redes.svg#x"/></svg>jue 29</span></div>
+          </div>
+          <div class="tarjeta art">
+            <b>Atalaya: leer el mundo en mi idioma</b>
+            <p>Un lector RSS que traduce en la torre, sin mandar nada fuera.</p>
+            <div class="fila"><span class="chip punto e-listo">Listo</span><span>ai-lab · 3</span><span class="der"><svg class="red"><use href="redes.svg#portfolio"/></svg>lun 9</span></div>
+          </div>
+          <div class="tarjeta art">
+            <b>Copias de seguridad que de verdad se pueden restaurar</b>
+            <p>Idea: probar la restauración cada mes, no solo la copia.</p>
+            <div class="fila"><span class="chip punto e-idea">Idea</span></div>
+          </div>
+        </div>
+        <span class="fab"><svg class="i"><use href="iconos.svg#mas"/></svg></span>
+        <div class="nav">
+          <div><span class="p"><svg class="i"><use href="iconos.svg#hoy"/></svg></span>Hoy</div>
+          <div class="sel"><span class="p"><svg class="i"><use href="iconos.svg#articulos"/></svg></span>Artículos</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#calendario"/></svg></span>Calendario</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#ajustes"/></svg></span>Ajustes</div>
+        </div>
+      </div>
+      <figcaption><b>2 · Artículos</b>Filtro por estado arriba. Cada tarjeta dice si hay propuestas del agente o conflictos pendientes.</figcaption>
+    </figure>
+
+    <!-- 3. Editor -->
+    <figure>
+      <div class="tel">
+        <div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 82%</span></div>
+        <div class="barra-sup">
+          <span class="ic"><svg class="i"><use href="iconos.svg#izq"/></svg></span>
+          <span class="espacio"></span>
+          <span class="chip" style="height:30px"><svg class="i s"><use href="iconos.svg#rama"/></svg>principal</span>
+          <span class="chip" style="height:30px;font-weight:600">ES</span>
+          <span class="ic"><svg class="i"><use href="iconos.svg#puntos"/></svg></span>
+        </div>
+        <div class="scroll ed">
+          <div class="serie">Montando ai-lab · parte 2 · Borrador</div>
+          <h1>llama-swap: un contenedor para todos mis modelos</h1>
+          <h2>Por qué no un contenedor por modelo</h2>
+          <p>llama-swap cambia eso: <span class="tachado">es un programa muy sencillo que</span> arranca el modelo que pide cada petición y apaga el anterior.</p>
+          <div class="foco">
+            <p>La consecuencia que no esperaba fue otra: como ya no tengo que pensar en qué está encendido, pruebo modelos nuevos mucho más a menudo.|</p>
+            <div class="selvar"><span class="chip"><svg class="i s"><use href="iconos.svg#izq"/></svg>A de 3<svg class="i s"><use href="iconos.svg#der"/></svg></span><span>desliza para cambiar de variante</span></div>
+          </div>
+        </div>
+        <div class="herram">
+          <div><svg class="i"><use href="iconos.svg#tachar"/></svg>Tachar</div>
+          <div><svg class="i"><use href="iconos.svg#nota"/></svg>Nota</div>
+          <div class="sel"><svg class="i"><use href="iconos.svg#variantes"/></svg>Fork</div>
+          <div><svg class="i"><use href="iconos.svg#historial"/></svg>Historial</div>
+          <div><svg class="i"><use href="iconos.svg#imagen"/></svg>Medio</div>
+          <div><svg class="i"><use href="iconos.svg#mas"/></svg>Bloque</div>
+        </div>
+        <div class="teclado">
+          <div><span>q</span><span>w</span><span>e</span><span>r</span><span>t</span><span>y</span><span>u</span><span>i</span><span>o</span><span>p</span></div>
+          <div><span>a</span><span>s</span><span>d</span><span>f</span><span>g</span><span>h</span><span>j</span><span>k</span><span>l</span><span>ñ</span></div>
+          <div><span>⇧</span><span>z</span><span>x</span><span>c</span><span>v</span><span>b</span><span>n</span><span>m</span><span>⌫</span></div>
+          <div><span>123</span><span>,</span><span class="esp"></span><span>.</span><span>↵</span></div>
+        </div>
+      </div>
+      <figcaption><b>3 · Editor</b>Se edita un párrafo a la vez. Las herramientas van sobre el teclado; deslizar el párrafo cambia de variante.</figcaption>
+    </figure>
+
+    <!-- 4. Variantes -->
+    <figure>
+      <div class="tel">
+        <div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 82%</span></div>
+        <div class="scroll ed" style="padding-top:60px">
+          <h2>Por qué no un contenedor por modelo</h2>
+          <p>Al principio cada modelo tenía su propio contenedor. Funcionaba, pero con 6 GB de VRAM solo cabía uno encendido a la vez.</p>
+        </div>
+        <div class="sombra"></div>
+        <div class="hoja">
+          <div class="asa"></div>
+          <h3>Variantes del párrafo</h3>
+          <p class="sub">La activa es la que se exporta. Las demás quedan guardadas.</p>
+          <div class="var activa">
+            <div class="cab"><b>A · activa</b><span>Tú</span><span class="d">hoy 10:42</span></div>
+            <p>La consecuencia que no esperaba fue otra: como ya no tengo que pensar en qué está encendido, pruebo modelos nuevos…</p>
+          </div>
+          <div class="var">
+            <div class="cab"><b>B</b><span>Tú</span><span class="d">ayer</span></div>
+            <p>Lo mejor no fue ahorrar VRAM, sino dejar de tener miedo a probar modelos nuevos.</p>
+            <div class="acc"><button class="btn g">Activar</button><button class="btn g fantasma">Comparar</button></div>
+          </div>
+          <div class="var">
+            <div class="cab"><b>C</b><span class="ia">IA</span><span>Claude · propuesta</span></div>
+            <p>El efecto secundario más valioso: probar un modelo nuevo pasó de ser un proyecto a ser un rato.</p>
+            <div class="acc"><button class="btn g">Activar</button><button class="btn g fantasma">Descartar</button></div>
+          </div>
+          <div class="acciones"><button class="btn g"><svg class="i"><use href="iconos.svg#mas"/></svg>Nueva variante</button></div>
+        </div>
+      </div>
+      <figcaption><b>4 · Variantes de un párrafo</b>Lo mismo sirve para una sección entera, desde el menú de su subtítulo.</figcaption>
+    </figure>
+
+    <!-- 5. Conflicto -->
+    <figure>
+      <div class="tel">
+        <div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 82%</span></div>
+        <div class="barra-sup">
+          <span class="ic"><svg class="i"><use href="iconos.svg#x"/></svg></span>
+          <span class="t">Elige una redacción</span>
+        </div>
+        <div class="scroll">
+          <div class="banda" style="align-items:flex-start"><svg class="i s" style="margin-top:2px"><use href="iconos.svg#rama"/></svg><span>Editaste este párrafo en el móvil sin conexión y en el portátil a la vez. Tinta guardó las dos. <b>La que no elijas queda como variante.</b></span></div>
+          <div class="var activa">
+            <div class="cab"><b>Móvil</b><span>hoy 08:15, sin conexión</span></div>
+            <p class="dif">No hace falta la máquina más grande. Hace falta que la máquina pequeña <span class="anadido">no tire nada</span>.</p>
+          </div>
+          <div class="var" style="margin-top:10px">
+            <div class="cab"><b>Portátil</b><span>hoy 09:02</span></div>
+            <p class="dif">No hace falta la máquina más grande. Hace falta que la máquina pequeña <span class="anadido">no desperdicie nada</span>.</p>
+          </div>
+          <div class="acciones" style="flex-direction:column">
+            <button class="btn g primario">Quedarme con la del móvil</button>
+            <button class="btn g">Quedarme con la del portátil</button>
+            <button class="btn g fantasma">Decidir más tarde</button>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>5 · Conflicto</b>Aparece al sincronizar si el mismo párrafo cambió en los dos sitios. Solo se marca la parte que difiere.</figcaption>
+    </figure>
+
+    <!-- 6. Publicación -->
+    <figure>
+      <div class="tel">
+        <div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 82%</span></div>
+        <div class="barra-sup">
+          <span class="ic"><svg class="i"><use href="iconos.svg#izq"/></svg></span>
+          <svg class="red"><use href="redes.svg#x"/></svg><span class="t">Hilo: llama-swap en 4 posts</span>
+        </div>
+        <div class="scroll">
+          <div class="tarjeta" style="padding:2px 14px">
+            <div class="campo"><span>Fecha</span>Lun 2 nov · 18:00</div>
+            <div class="campo"><span>Estado</span><span class="chip punto e-preparando">Preparando</span><span class="der"><svg class="i s"><use href="iconos.svg#abajo"/></svg></span></div>
+            <div class="campo"><span>Artículo</span>llama-swap: un contenedor…</div>
+          </div>
+          <div class="etq">Posts del hilo</div>
+          <div class="post">Tenía un contenedor por cada modelo de IA en mi torre. Con 6 GB de VRAM solo cabía uno a la vez, y yo hacía de semáforo.<div class="pie"><span>1 / 4</span><span>131 / 280</span></div></div>
+          <div class="post pasa">Lo que no esperaba: como ya no pienso en qué está encendido, pruebo modelos nuevos mucho más a menudo. Añadir uno son cinco líneas de YAML. Antes era una tarde entera de pelearme con Docker…<div class="pie"><span>3 / 4 · se pasa</span><span>297 / 280</span></div></div>
+          <div class="acciones">
+            <button class="btn g"><svg class="i s"><use href="iconos.svg#copiar"/></svg>Copiar post 1</button>
+            <button class="btn g primario"><svg class="i s"><use href="iconos.svg#check"/></svg>Publicada</button>
+          </div>
+        </div>
+        <div class="nav">
+          <div><span class="p"><svg class="i"><use href="iconos.svg#hoy"/></svg></span>Hoy</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#articulos"/></svg></span>Artículos</div>
+          <div class="sel"><span class="p"><svg class="i"><use href="iconos.svg#calendario"/></svg></span>Calendario</div>
+          <div><span class="p"><svg class="i"><use href="iconos.svg#ajustes"/></svg></span>Ajustes</div>
+        </div>
+      </div>
+      <figcaption><b>6 · Publicación</b>Un hilo de X con su contador por post. «Copiar» y luego «Publicada», que pide el enlace del post.</figcaption>
+    </figure>
+
+    <!-- 7. Resumen diario -->
+    <figure>
+      <div class="tel bloqueo">
+        <div class="sb"><span>8:00</span><span class="cam"></span><span>●●● 91%</span></div>
+        <div class="reloj"><b>8:00</b><span>lunes, 26 de octubre</span></div>
+        <div class="notif">
+          <div class="cab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="logo.svg#t"/></svg>Tinta · resumen diario</div>
+          <b>Hoy: 1 publicación</b>
+          <ul>
+            <li><svg class="red"><use href="redes.svg#instagram"/></svg>12:00 · Carrusel: la escena pixel art</li>
+            <li><svg class="red"><use href="redes.svg#linkedin"/></svg>Mañana · Lo que cambió al dirigir agentes</li>
+            <li style="color:#a8a8a8">2 propuestas del agente esperan revisión</li>
+          </ul>
+          <div class="acc"><span>Abrir Hoy</span><span>Más tarde</span></div>
+        </div>
+      </div>
+      <figcaption><b>7 · Resumen diario</b>Un aviso al día, a la hora que elijas en Ajustes. Lo programa el móvil, así que llega aunque no haya red.</figcaption>
+    </figure>
+
+  </div>
+</div>
+</body>
+</html>

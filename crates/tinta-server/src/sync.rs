@@ -91,6 +91,8 @@ pub enum Op {
     CrearArticulo { titulo: String, ids: IdsDados },
     CambiarArticulo { id: String, cambio: modelo::CambioArticulo },
     CambiarIdioma { id: String, cambio: modelo::CambioIdioma },
+    BorrarArticulo { id: String },
+    RestaurarArticulo { id: String },
     CrearSeccion { rama_id: String, #[serde(default)] titulo: String, antes: Option<String>, despues: Option<String>, ids: IdsDados },
     CambiarSeccion { id: String, cambio: modelo::CambioSeccion },
     BorrarSeccion { id: String },
@@ -150,6 +152,9 @@ pub fn aplicar(c: &mut Connection, op: Op, dispositivo: &str) -> Res<Value> {
         }
         CambiarArticulo { id, cambio } => modelo::actualizar_articulo(c, &id, cambio).map(|_| json!({})),
         CambiarIdioma { id, cambio } => modelo::actualizar_idioma(c, &id, cambio).map(|_| json!({})),
+        BorrarArticulo { id } => borrado_ok(modelo::borrar_articulo(c, &id)),
+        // Restaurar lo que ya está vivo tampoco es un error.
+        RestaurarArticulo { id } => borrado_ok(modelo::restaurar_articulo(c, &id)),
         CrearSeccion { rama_id, titulo, antes, despues, ids } => {
             if ya_creado(c, "secciones", &ids.seccion)? {
                 return Ok(json!({ "repetida": true }));

@@ -187,6 +187,10 @@ async fn cambiar_articulo(State(e): State<Estado>, Path(id): Path<String>, Json(
     Ok(Json(e.con(|c| modelo::actualizar_articulo(c, &id, b))?))
 }
 
+async fn restaurar_articulo(State(e): State<Estado>, Path(id): Path<String>) -> R<Json<modelo::Articulo>> {
+    Ok(Json(e.con(|c| modelo::restaurar_articulo(c, &id))?))
+}
+
 async fn borrar_articulo(State(e): State<Estado>, Path(id): Path<String>) -> R<StatusCode> {
     e.con(|c| modelo::borrar_articulo(c, &id))?;
     Ok(StatusCode::NO_CONTENT)
@@ -550,6 +554,7 @@ pub fn rutas(e: Estado) -> Router {
         .route("/articulos", get(articulos).post(crear_articulo))
         .route("/articulos/{id}", get(articulo).patch(cambiar_articulo).delete(borrar_articulo))
         .route("/articulos/{id}/idiomas", post(crear_idioma))
+        .route("/articulos/{id}/restaurar", post(restaurar_articulo))
         .route("/articulos/{id}/exportar.zip", get(zip))
         .route("/idiomas/{id}", axum::routing::patch(cambiar_idioma).delete(borrar_idioma))
         .route("/idiomas/{id}/markdown", get(markdown))

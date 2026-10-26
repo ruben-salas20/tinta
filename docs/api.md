@@ -42,7 +42,8 @@ Artículo → Idioma (es | en) → Rama → Sección → Variante de sección �
 | `POST /api/articulos` | `{titulo}` | 201 y el `Articulo`. Ya trae idioma `es`, rama `principal` y un párrafo vacío |
 | `GET /api/articulos/{id}` | | `Articulo` |
 | `PATCH /api/articulos/{id}` | Cualquiera de `slug`, `estado`, `serie_id`, `serie_parte`, `fecha` (`AAAA-MM-DD`), `etiquetas` (lista de nombres). `null` vacía el campo; un campo ausente no se toca | `Articulo` |
-| `DELETE /api/articulos/{id}` | | 204 |
+| `DELETE /api/articulos/{id}` | | 204. Borra también sus publicaciones sin publicar; las publicadas se quedan |
+| `POST /api/articulos/{id}/restaurar` | | `Articulo`. Deshace el borrado, con las publicaciones que se fueron con él. Si su slug ya lo usa otro, recibe uno nuevo |
 | `POST /api/articulos/{id}/idiomas` | `{idioma, copiar_de?}`. Con `copiar_de: "es"` copia la rama principal en español, como punto de partida para traducir | `Articulo` |
 | `GET /api/articulos/{id}/exportar.zip?idiomas=es,en` | | El `.zip` para el portfolio. Sin `idiomas`, todos |
 
@@ -180,6 +181,7 @@ La app trabaja sin conexión: guarda una copia y una cola de cambios. La lógica
 | `guardar` | `variante_bloque_id, contenido, rev_base`. Devuelve `conflicto`, `variante_id` y `rev` |
 | `crear_articulo` | `titulo, ids: {articulo, idioma, rama, seccion, variante_seccion, bloque, variante_bloque}` |
 | `cambiar_articulo` / `cambiar_idioma` | `id, cambio` (los mismos campos que el `PATCH`) |
+| `borrar_articulo` / `restaurar_articulo` | `id` |
 | `crear_seccion` | `rama_id, titulo, antes?, despues?, ids: {seccion, variante_seccion, bloque, variante_bloque}` |
 | `cambiar_seccion` / `borrar_seccion` | `id, cambio?` |
 | `cambiar_variante_seccion` | `id, titulo` |

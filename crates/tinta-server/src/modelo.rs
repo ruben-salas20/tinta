@@ -641,14 +641,40 @@ fn etiqueta(c: &Connection, nombre: &str, rev: i64) -> Res<String> {
     Ok(id)
 }
 
+/// Borra un artículo y sus publicaciones aún no publicadas. Las publicadas se
+/// quedan: son el historial de lo que salió. Todo lleva la misma rev, que es
+/// lo que usa [`restaurar_articulo`] para deshacerlo.
 pub fn borrar_articulo(c: &mut Connection, id: &str) -> Res<()> {
     let tx = c.transaction()?;
     let rev = siguiente_rev(&tx)?;
     if tx.execute("UPDATE articulos SET borrado = 1, rev = ?2 WHERE id = ?1 AND borrado = 0", params![id, rev])? == 0 {
         return Err(Error::NoExiste("artículo"));
     }
+    tx.execute(
+        "UPDATE publicaciones SET borrado = 1, rev = ?2 WHERE articulo_id = ?1 AND borrado = 0 AND estado != 'publicada'",
+        params![id, rev],
+    )?;
     tx.commit()?;
     Ok(())
+}
+
+/// Deshace [`borrar_articulo`]: vuelve el artículo y las publicaciones que se
+/// borraron con él. Si otro artículo tomó su slug entretanto, recibe otro.
+pub fn restaurar_articulo(c: &mut Connection, id: &str) -> Res<Articulo> {
+    let tx = c.transaction()?;
+    let (slug_viejo, rev_borrado): (String, i64) = tx
+        .query_row("SELECT slug, rev FROM articulos WHERE id = ?1 AND borrado = 1", params![id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .optional()?
+        .ok_or(Error::NoExiste("artículo borrado"))?;
+    let rev = siguiente_rev(&tx)?;
+    let s = slug_libre(&tx, &slug_viejo, Some(id))?;
+    tx.execute("UPDATE articulos SET borrado = 0, slug = ?2, rev = ?3, cambiado = ?4 WHERE id = ?1", params![id, s, rev, ahora()])?;
+    tx.execute(
+        "UPDATE publicaciones SET borrado = 0, rev = ?3 WHERE articulo_id = ?1 AND borrado = 1 AND rev = ?2",
+        params![id, rev_borrado, rev],
+    )?;
+    tx.commit()?;
+    articulo(c, id)
 }
 
 #[derive(Debug, Serialize)]
@@ -1725,5 +1751,28 @@ mod pruebas {
         assert_eq!(den.secciones.len(), 2);
         assert_eq!(den.secciones[1].variantes[0].titulo, "Setup");
         assert!(crear_idioma_escrito(&mut c, &a.id, "en", "x", "", &secs, "ia:c").is_err());
+    }
+
+    #[test]
+    fn borrar_y_restaurar_articulo() {
+        let mut c = en_memoria();
+        let (a, _) = nuevo(&mut c);
+        let nueva = |fecha: &str, estado: &str| crate::calendario::NuevaPublicacion {
+            canal_id: "x".into(), formato: "post".into(), fecha: fecha.into(), hora: None, estado: estado.into(),
+            titulo: String::new(), partes: None, articulo_id: Some(a.id.clone()), origen: "tu".into(),
+        };
+        let idea = crate::calendario::crear_publicacion(&mut c, nueva("2026-11-01", "idea")).unwrap();
+        let hecha = crate::calendario::crear_publicacion(&mut c, nueva("2026-10-01", "publicada")).unwrap();
+        borrar_articulo(&mut c, &a.id).unwrap();
+        assert!(listar_articulos(&c).unwrap().is_empty());
+        assert!(crate::calendario::publicacion(&c, &idea.id).is_err());
+        assert!(crate::calendario::publicacion(&c, &hecha.id).is_ok(), "la publicada se queda");
+        // Otro artículo toma su slug mientras está borrado.
+        let otro = crear_articulo(&mut c, "¿Por qué llama-swap?").unwrap();
+        assert_eq!(otro.slug, a.slug);
+        let r = restaurar_articulo(&mut c, &a.id).unwrap();
+        assert_ne!(r.slug, otro.slug);
+        assert!(crate::calendario::publicacion(&c, &idea.id).is_ok());
+        assert!(restaurar_articulo(&mut c, &a.id).is_err());
     }
 }

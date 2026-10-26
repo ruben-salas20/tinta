@@ -125,9 +125,11 @@ export interface Exportacion {
   archivos: { nombre: string; tipo: string }[];
 }
 export interface ParaX {
+  titulo: string;
   html: string;
   texto: string;
   imagenes: string[];
+  codigos: { lenguaje: string; codigo: string }[];
   avisos: Avisos;
 }
 export interface Entre {

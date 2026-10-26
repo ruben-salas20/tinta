@@ -72,6 +72,15 @@
     }
   }
 
+  async function copiar(texto: string, aviso: string) {
+    try {
+      await copiarTexto(texto);
+      avisar(aviso);
+    } catch (e) {
+      fallo(e);
+    }
+  }
+
   async function copiarX() {
     if (!x) return;
     try {
@@ -134,7 +143,13 @@
 
       <section class="col">
         <h3><Icono n="x" red />Para X Articles</h3>
-        <p>Copia el texto con formato. Pégalo en el editor de X Articles.</p>
+        <p>El título va en su propio campo de X. El texto se copia con formato, ya adaptado a lo que X conserva.</p>
+        {#if x}
+          <div class="titulo-x">
+            <b>{x.titulo}</b>
+            <button class="btn" onclick={() => copiar(x!.titulo, 'Título copiado.')}><Icono n="copiar" s />Copiar título</button>
+          </div>
+        {/if}
         <div class="vista-x">
           {#if x}
             <!-- El HTML lo genera el servidor desde el Markdown del artículo. -->
@@ -149,8 +164,16 @@
               <div class="mal"><Icono n="imagen" s />{plural(x.imagenes.length, 'imagen', 'imágenes')}: X no las recibe al pegar. Súbelas a mano: {x.imagenes.join(', ')}.</div>
             {/if}
             {#if x.avisos.audios}<div><Icono n="audio" s />El audio se omite: X Articles no admite audio.</div>{/if}
+            {#if x.codigos.length}
+              <div class="mal"><Icono n="nota" s />{plural(x.codigos.length, 'bloque de código', 'bloques de código')}: X no los recibe al pegar. Añádelos con el botón de código de X y pega cada uno:</div>
+              <div class="codigos">
+                {#each x.codigos as c, i (i)}
+                  <button class="btn" onclick={() => copiar(c.codigo, `Código ${i + 1} copiado.`)}><Icono n="copiar" s />Código {i + 1}{c.lenguaje ? ` · ${c.lenguaje}` : ''}</button>
+                {/each}
+              </div>
+            {/if}
             {#if x.avisos.videos}<div><Icono n="play" s />Los vídeos de YouTube van como enlace.</div>{/if}
-            <div style="color:var(--muted)"><Icono n="nota" s />Sin probar aún: si X conserva los bloques de código.</div>
+            <div style="color:var(--muted)"><Icono n="nota" s />Los subtítulos de tercer nivel pasan a negrita y los puntos anidados suben un nivel: X no admite ninguno de los dos.</div>
           </div>
         {/if}
         <div class="v-pie">
@@ -166,6 +189,9 @@
   .idioma { display: inline-flex; gap: 6px; align-items: center; margin-right: 12px; }
   .apagado { opacity: 0.45; pointer-events: none; }
   .vista-x { max-height: 380px; overflow: auto; }
+  .titulo-x { display: flex; align-items: center; gap: 10px; }
+  .titulo-x b { flex: 1; font-size: 15px; }
+  .codigos { display: flex; gap: 6px; flex-wrap: wrap; padding-left: 22px; }
   .vista-x :global(h1) { font-size: 22px; line-height: 1.2; margin: 0 0 12px; font-weight: 800; }
   .vista-x :global(h2) { font-size: 17px; margin: 14px 0 6px; font-weight: 700; }
   .vista-x :global(p) { margin: 0 0 8px; font-size: 14.5px; line-height: 1.5; }

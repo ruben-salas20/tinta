@@ -47,7 +47,10 @@ pub struct Avisos {
 pub struct Exportado {
     pub idioma: String,
     pub markdown: String,
-    pub cuerpo: String,
+    /// Los trozos del cuerpo por separado: cada subtítulo y cada bloque.
+    /// Un bloque de código puede llevar líneas en blanco, así que el cuerpo
+    /// no se puede volver a partir por ellas.
+    pub partes: Vec<String>,
     pub titulo: String,
     pub archivos: BTreeMap<String, Archivo>,
     pub avisos: Avisos,
@@ -169,7 +172,7 @@ pub fn exportar_idioma(c: &Connection, idioma_id: &str) -> Res<Exportado> {
         fm.push_str("translatedWithAI: true\n");
     }
     fm.push_str("---\n\n");
-    Ok(Exportado { idioma, markdown: format!("{fm}{cuerpo}\n"), cuerpo, titulo: i.titulo.clone(), archivos, avisos })
+    Ok(Exportado { idioma, markdown: format!("{fm}{cuerpo}\n"), partes, titulo: i.titulo.clone(), archivos, avisos })
 }
 
 /// El `.zip` para descomprimir en la raíz del repo del portfolio.
@@ -204,23 +207,40 @@ pub fn zip(c: &Connection, articulo_id: &str, idiomas: &[String], medios: &Path)
 }
 
 #[derive(Debug, Serialize)]
+pub struct Codigo {
+    pub lenguaje: String,
+    pub codigo: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct ParaX {
+    /// X Articles tiene su propio campo de título: va aparte, no en el HTML.
+    pub titulo: String,
     /// Para el portapapeles como text/html.
     pub html: String,
     /// Para el portapapeles como text/plain.
     pub texto: String,
     /// Imágenes que hay que subir a mano en el editor de X.
     pub imagenes: Vec<String>,
+    /// Bloques de código que hay que añadir con el botón de código de X.
+    pub codigos: Vec<Codigo>,
     pub avisos: Avisos,
 }
 
-/// HTML para pegar en X Articles. X no recibe imágenes ni audio al pegar:
-/// cada imagen deja un aviso con su nombre en su sitio y el audio se omite.
+/// HTML para pegar en X Articles, adaptado a lo que X conserva al pegar
+/// (probado a mano el 2026-10-26). X conserva negrita, cursiva, enlaces,
+/// un nivel de subtítulo, listas de un nivel y citas. No recibe:
+/// - el título: va en su propio campo;
+/// - imágenes ni bloques de código: cada uno deja un aviso en su sitio;
+/// - audio: se omite;
+/// - subtítulos `###` o más: pasan a un párrafo en negrita;
+/// - listas anidadas: sus puntos suben al primer nivel, con «–» delante.
 pub fn para_x(c: &Connection, idioma_id: &str) -> Res<ParaX> {
     let e = exportar_idioma(c, idioma_id)?;
     let mut imagenes = Vec::new();
+    let mut codigos = Vec::new();
     let mut partes = Vec::new();
-    for parte in e.cuerpo.split("\n\n") {
+    for parte in &e.partes {
         let p = parte.trim();
         if p.starts_with("<audio") {
             continue;
@@ -231,17 +251,52 @@ pub fn para_x(c: &Connection, idioma_id: &str) -> Res<ParaX> {
             imagenes.push(nombre);
             continue;
         }
-        partes.push(p.to_string());
+        if let Some(resto) = p.strip_prefix("```") {
+            let (lenguaje, cuerpo) = resto.split_once('\n').unwrap_or((resto, ""));
+            let codigo = cuerpo.trim_end().strip_suffix("```").unwrap_or(cuerpo).trim_end_matches('\n').to_string();
+            codigos.push(Codigo { lenguaje: lenguaje.trim().to_string(), codigo });
+            let n = codigos.len();
+            partes.push(format!("**[Bloque de código {n}: añádelo aquí con el botón de código de X]**"));
+            continue;
+        }
+        if let Some(t) = p.strip_prefix("###").map(|t| t.trim_start_matches('#').trim())
+            && !p.contains('\n')
+        {
+            partes.push(format!("**{t}**"));
+            continue;
+        }
+        partes.push(aplanar_listas(p));
     }
     let md = partes.join("\n\n");
-    let mut html = format!("<h1>{}</h1>\n", escapar(&e.titulo));
+    let mut html = String::new();
     let op = pulldown_cmark::Options::ENABLE_STRIKETHROUGH | pulldown_cmark::Options::ENABLE_TABLES;
     pulldown_cmark::html::push_html(&mut html, pulldown_cmark::Parser::new_ext(&md, op));
-    Ok(ParaX { html, texto: format!("{}\n\n{md}", e.titulo), imagenes, avisos: e.avisos })
+    Ok(ParaX { titulo: e.titulo, html, texto: md, imagenes, codigos, avisos: e.avisos })
 }
 
-fn escapar(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+/// Sube los puntos anidados al primer nivel de su lista, con «–» delante.
+fn aplanar_listas(p: &str) -> String {
+    let es_punto = |l: &str| {
+        let l = l.trim_start();
+        l.starts_with("- ") || l.starts_with("* ") || l.split_once(". ").is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+    };
+    if !p.lines().next().is_some_and(es_punto) {
+        return p.to_string();
+    }
+    let primero = p.lines().next().unwrap();
+    let marca = if primero.starts_with("- ") || primero.starts_with("* ") { "-" } else { "1." };
+    p.lines()
+        .map(|l| {
+            if l.starts_with(' ') && es_punto(l) {
+                let t = l.trim_start();
+                let t = t.split_once(' ').map_or(t, |(_, r)| r);
+                format!("{marca} – {t}")
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 #[cfg(test)]
@@ -297,10 +352,35 @@ Antes tenía lío.\n\n## La configuración\n\n```yaml\nmodels:\n  ttl: 300 \n```
         );
 
         let x = para_x(&c, &iid).unwrap();
-        assert!(x.html.starts_with("<h1>llama-swap: un contenedor</h1>"));
+        assert_eq!(x.titulo, "llama-swap: un contenedor");
+        assert!(!x.html.contains("<h1>"));
+        assert!(x.html.contains("Bloque de código 1"));
+        assert_eq!(x.codigos[0].lenguaje, "yaml");
+        assert_eq!(x.codigos[0].codigo, "models:\n  ttl: 300 ");
         assert!(x.html.contains("<h2>La configuración</h2>"));
         assert!(x.html.contains("Imagen: vram-en-reposo.png"));
         assert!(!x.html.contains("audio"));
         assert_eq!(x.imagenes, ["vram-en-reposo.png"]);
+    }
+
+    #[test]
+    fn x_aplana_listas_y_subtitulos() {
+        assert_eq!(aplanar_listas("- uno\n- dos\n  - anidado"), "- uno\n- dos\n- – anidado");
+        assert_eq!(aplanar_listas("1. uno\n   - sub"), "1. uno\n1. – sub");
+        assert_eq!(aplanar_listas("Un párrafo\n  - no es lista"), "Un párrafo\n  - no es lista");
+
+        let mut c = en_memoria();
+        let a = crear_articulo(&mut c, "T").unwrap();
+        let iid = a.idiomas[0].resumen.id.clone();
+        let d = documento(&c, a.idiomas[0].resumen.rama_principal_id.as_ref().unwrap()).unwrap();
+        let vs = d.secciones[0].variantes[0].id.clone();
+        crear_bloque(&mut c, &vs, NuevoBloque { tipo: "subtitulo".into(), contenido: "### Detalle".into(), entre: Entre::default() }).unwrap();
+        // Un bloque de código con una línea en blanco dentro no se parte.
+        crear_bloque(&mut c, &vs, NuevoBloque { tipo: "codigo".into(), contenido: "```\na\n\nb\n```".into(), entre: Entre::default() }).unwrap();
+        let x = para_x(&c, &iid).unwrap();
+        assert!(x.html.contains("<p><strong>Detalle</strong></p>"), "{}", x.html);
+        assert_eq!(x.codigos.len(), 1);
+        assert_eq!(x.codigos[0].codigo, "a\n\nb");
+        assert!(!x.html.contains("<pre>"));
     }
 }

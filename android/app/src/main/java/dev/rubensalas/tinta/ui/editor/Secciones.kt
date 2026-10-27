@@ -41,6 +41,7 @@ import dev.rubensalas.tinta.data.SeccionVista
 import dev.rubensalas.tinta.data.autor
 import dev.rubensalas.tinta.data.local.VarianteSeccionE
 import dev.rubensalas.tinta.data.texto.Critic
+import dev.rubensalas.tinta.data.texto.ponerPrefijo
 import dev.rubensalas.tinta.ui.tema.Estilos
 import dev.rubensalas.tinta.ui.tema.Tinta
 
@@ -179,9 +180,9 @@ private val NOMBRE_TIPO = mapOf("parrafo" to "Párrafo", "subtitulo" to "Subtít
 fun conTipo(tipo: String, contenido: String): String {
     val lineas = contenido.lines().map { it.removePrefix("### ").removePrefix("- ").removePrefix("> ").removePrefix(">") }
     return when (tipo) {
-        "subtitulo" -> "### " + lineas.filter { it.isNotBlank() }.joinToString(" ")
-        "lista" -> lineas.filter { it.isNotBlank() }.joinToString("\n") { "- $it" }
-        "cita" -> lineas.joinToString("\n") { if (it.isBlank()) ">" else "> $it" }
+        "subtitulo" -> ponerPrefijo(tipo, lineas.filter { it.isNotBlank() }.joinToString(" "))
+        "lista" -> lineas.filter { it.isNotBlank() }.joinToString("\n") { ponerPrefijo(tipo, it) }
+        "cita" -> lineas.joinToString("\n") { ponerPrefijo(tipo, it) }
         else -> lineas.joinToString("\n")
     }
 }

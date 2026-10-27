@@ -8,15 +8,21 @@ package dev.rubensalas.tinta.data.texto
  * texto los pinta con su estilo y la edición no puede partirlos: si un cambio
  * borra alguno, se rechaza ([aplicar]). Así escribir nunca pierde una marca;
  * solo se quitan con sus botones de aceptar o descartar.
+ *
+ * El prefijo Markdown del tipo de bloque (`### `, `- `, `> `) no está en el
+ * texto: se quita al leer y se pone al volver a CriticMarkup.
  */
 class Edicion private constructor(
     /** El texto que edita el campo, con un marcador por marca. */
     val texto: String,
     /** La marca de cada marcador, por orden de aparición. */
     val marcas: List<Trozo>,
+    /** El tipo de bloque, que decide el prefijo de cada línea. */
+    private val tipo: String,
 ) {
-    /** Vuelve a CriticMarkup. */
-    fun aMarkup(): String = aMarkup(texto)
+    /** Vuelve a CriticMarkup, con el prefijo de cada línea. */
+    fun aMarkup(): String =
+        if (texto.isEmpty()) "" else aMarkup(texto.split('\n').joinToString("\n") { ponerPrefijo(tipo, it) })
 
     private fun aMarkup(t: String): String {
         val trozos = mutableListOf<Trozo>()
@@ -42,7 +48,7 @@ class Edicion private constructor(
         val antes = texto.filter { indice(it) != null }
         val despues = nuevo.filter { indice(it) != null }
         if (antes != despues) return null
-        return Edicion(nuevo, marcas)
+        return Edicion(nuevo, marcas, tipo)
     }
 
     /**
@@ -58,13 +64,13 @@ class Edicion private constructor(
         if (a == b) {
             val conNota = marcas + Trozo.Nota(nota.trim())
             val t = texto.substring(0, a) + marcador(conNota.size - 1) + texto.substring(a)
-            return Edicion(t, conNota)
+            return Edicion(t, conNota, tipo)
         }
         val trozo = texto.substring(a, b)
         if (trozo.any { indice(it) != null }) return null
         val nuevas = marcas + Trozo.Resaltado(trozo) + Trozo.Nota(nota.trim())
         val t = texto.substring(0, a) + marcador(nuevas.size - 2) + marcador(nuevas.size - 1) + texto.substring(b)
-        return Edicion(t, nuevas)
+        return Edicion(t, nuevas, tipo)
     }
 
     private fun envolver(desde: Int, hasta: Int, f: (String) -> Trozo): Edicion? {
@@ -73,7 +79,7 @@ class Edicion private constructor(
         val trozo = texto.substring(a, b)
         if (trozo.any { indice(it) != null }) return null
         val nuevas = marcas + f(trozo)
-        return Edicion(texto.substring(0, a) + marcador(nuevas.size - 1) + texto.substring(b), nuevas)
+        return Edicion(texto.substring(0, a) + marcador(nuevas.size - 1) + texto.substring(b), nuevas, tipo)
     }
 
     /** Las marcas en el orden del texto, con su índice para `Critic.resolver`. */
@@ -87,7 +93,8 @@ class Edicion private constructor(
 
         fun marcador(i: Int): Char = (BASE + i).toChar()
 
-        fun desde(markup: String): Edicion {
+        /** Lee el CriticMarkup de un bloque de tipo [tipo] y quita su prefijo de cada línea. */
+        fun desde(markup: String, tipo: String): Edicion {
             // Un marcador escrito de verdad en el texto se perdería: se quita.
             val trozos = Critic.leer(markup.filter { indice(it) == null })
             val marcas = mutableListOf<Trozo>()
@@ -100,7 +107,24 @@ class Edicion private constructor(
                     t.append(marcador(marcas.size - 1))
                 }
             }
-            return Edicion(t.toString(), marcas)
+            val texto = t.toString().split('\n').joinToString("\n") { quitarPrefijo(tipo, it) }
+            return Edicion(texto, marcas, tipo)
         }
     }
+}
+
+/** El prefijo Markdown que lleva cada línea de un bloque de tipo [tipo]. */
+fun ponerPrefijo(tipo: String, linea: String): String = when (tipo) {
+    "subtitulo" -> "### $linea"
+    "lista" -> "- $linea"
+    "cita" -> if (linea.isEmpty()) ">" else "> $linea"
+    else -> linea
+}
+
+/** Quita el prefijo de [ponerPrefijo]. Una línea sin prefijo se queda igual. */
+fun quitarPrefijo(tipo: String, linea: String): String = when (tipo) {
+    "subtitulo" -> linea.removePrefix("### ")
+    "lista" -> linea.removePrefix("- ")
+    "cita" -> if (linea.startsWith("> ")) linea.drop(2) else linea.removePrefix(">")
+    else -> linea
 }

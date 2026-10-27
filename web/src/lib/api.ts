@@ -115,6 +115,12 @@ export interface CambioPublicacion {
   articulo_id?: string | null;
   enlace?: string | null;
 }
+/** Parte del contenido crudo (con marcas) que viene de una propuesta aceptada del agente. Posiciones en caracteres. */
+export interface Rango {
+  desde: number;
+  hasta: number;
+  agente: string;
+}
 export interface VarianteBloque {
   id: string;
   contenido: string;
@@ -122,6 +128,7 @@ export interface VarianteBloque {
   creado: string;
   cambiado: string;
   rev: number;
+  autoria: Rango[];
 }
 export type TipoBloque = 'parrafo' | 'subtitulo' | 'lista' | 'cita' | 'codigo' | 'imagen' | 'audio' | 'youtube';
 export interface Bloque {

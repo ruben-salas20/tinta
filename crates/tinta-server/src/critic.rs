@@ -13,6 +13,7 @@
 //! agente. Una nota del agente es `{>>ia:nombre: texto<<}`. La distinción
 //! importa en el tachado: el de Rubén ya está decidido, el del agente no.
 
+use crate::autoria::Rango;
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -167,8 +168,11 @@ pub enum Decision {
 /// - Propuesta del agente: aceptar la aplica, rechazar la deshace.
 /// - Nota: las dos opciones la quitan, junto con su ancla `{==x==}`.
 ///
+/// Devuelve el texto resultante y, si aceptar una propuesta del agente dejó
+/// texto, el rango que ocupa en el resultado (en caracteres) y el agente.
+/// Aceptar un borrado no deja texto, así que no da rango.
 /// Devuelve `None` si no existe esa marca.
-pub fn resolver(s: &str, indice: usize, decision: Decision) -> Option<String> {
+pub fn resolver_con_origen(s: &str, indice: usize, decision: Decision) -> Option<(String, Option<Rango>)> {
     let mut trozos = leer(s);
     let pos = trozos
         .iter()
@@ -177,10 +181,21 @@ pub fn resolver(s: &str, indice: usize, decision: Decision) -> Option<String> {
         .nth(indice)?
         .0;
     let acepta = decision == Decision::Aceptar;
+    let mut origen = None;
     let nuevo = match &trozos[pos] {
         Trozo::Borrado { texto, .. } => if acepta { String::new() } else { texto.clone() },
-        Trozo::Anadido { texto, .. } => if acepta { texto.clone() } else { String::new() },
-        Trozo::Cambio { antes, despues, .. } => if acepta { despues.clone() } else { antes.clone() },
+        Trozo::Anadido { texto, ia } => {
+            if acepta {
+                origen = rango_de_agente(&trozos[..pos], texto, ia);
+            }
+            if acepta { texto.clone() } else { String::new() }
+        }
+        Trozo::Cambio { antes, despues, ia } => {
+            if acepta {
+                origen = rango_de_agente(&trozos[..pos], despues, ia);
+            }
+            if acepta { despues.clone() } else { antes.clone() }
+        }
         Trozo::Nota { .. } => {
             if pos > 0
                 && let Trozo::Resaltado(x) = &trozos[pos - 1]
@@ -192,7 +207,18 @@ pub fn resolver(s: &str, indice: usize, decision: Decision) -> Option<String> {
         Trozo::Texto(_) | Trozo::Resaltado(_) => unreachable!(),
     };
     trozos[pos] = Trozo::Texto(nuevo);
-    Some(escribir(&trozos))
+    Some((escribir(&trozos), origen))
+}
+
+/// El rango de `nuevo` si lo propuso un agente. `antes` son los trozos que
+/// quedan por delante, para contar dónde empieza.
+fn rango_de_agente(antes: &[Trozo], nuevo: &str, ia: &Option<String>) -> Option<Rango> {
+    let agente = ia.as_ref()?;
+    if nuevo.is_empty() {
+        return None;
+    }
+    let desde = escribir(antes).chars().count();
+    Some(Rango { desde, hasta: desde + nuevo.chars().count(), agente: agente.clone() })
 }
 
 /// Qué propone un agente sobre un trozo de texto que ya existe.
@@ -255,6 +281,10 @@ pub fn anotar(s: &str, nota: &str, ancla: Option<&str>, ia: &str) -> Option<Stri
 mod pruebas {
     use super::*;
 
+    fn resolver(s: &str, indice: usize, decision: Decision) -> Option<String> {
+        resolver_con_origen(s, indice, decision).map(|(texto, _)| texto)
+    }
+
     const EJEMPLO: &str = "llama-swap {--es muy sencillo y--} arranca {~~El ttl dice~>El campo ttl marca~~}{>>ia:claude<<} y {++apaga++}{>>ia:claude<<} el {==anterior==}{>>poner tiempos<<}. {--Fin--}{>>ia:claude<<}";
 
     #[test]
@@ -291,6 +321,27 @@ mod pruebas {
         let r = resolver(EJEMPLO, 4, Decision::Aceptar).unwrap();
         assert!(r.ends_with("anterior==}{>>poner tiempos<<}. "), "{r}");
         assert!(resolver(EJEMPLO, 9, Decision::Aceptar).is_none());
+    }
+
+    #[test]
+    fn aceptar_propuesta_da_su_rango_en_caracteres() {
+        // Tildes y emoji: «ñandú 🙂» son 7 caracteres pero más bytes.
+        let s = "Qué 🚀 {++ñandú 🙂++}{>>ia:claude<<} fin";
+        let (texto, origen) = resolver_con_origen(s, 0, Decision::Aceptar).unwrap();
+        assert_eq!(texto, "Qué 🚀 ñandú 🙂 fin");
+        assert_eq!(origen, Some(Rango { desde: 6, hasta: 13, agente: "claude".into() }));
+
+        let (texto, origen) = resolver_con_origen("Hola {~~mundo~>mar~~}{>>ia:claude<<} y", 0, Decision::Aceptar).unwrap();
+        assert_eq!(texto, "Hola mar y");
+        assert_eq!(origen, Some(Rango { desde: 5, hasta: 8, agente: "claude".into() }));
+    }
+
+    #[test]
+    fn solo_aceptar_propuesta_del_agente_da_rango() {
+        // Un borrado del agente no deja texto. Rechazar no deja nada, y el añadido de Rubén no es de ningún agente.
+        assert_eq!(resolver_con_origen("Hola {--x--}{>>ia:claude<<}", 0, Decision::Aceptar).unwrap(), ("Hola ".to_string(), None));
+        assert_eq!(resolver_con_origen("Hola {++x++}{>>ia:claude<<}", 0, Decision::Rechazar).unwrap(), ("Hola ".to_string(), None));
+        assert_eq!(resolver_con_origen("Hola {++x++}", 0, Decision::Aceptar).unwrap(), ("Hola x".to_string(), None));
     }
 
     #[test]

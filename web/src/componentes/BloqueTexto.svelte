@@ -4,7 +4,8 @@
   import StarterKit from '@tiptap/starter-kit';
   import type { Bloque, TipoBloque } from '../lib/api';
   import { activaBloque, type ControlEditor } from '../lib/editor.svelte';
-  import { CritAnadido, CritBorrado, CritCambio, CritNota, CritResaltado, Tinta, ocurrencias, type Ocurrencia } from '../lib/extensiones';
+  import { AutoriaIa, CritAnadido, CritBorrado, CritCambio, CritNota, CritResaltado, Tinta, claveAutoria, ocurrencias, type Ocurrencia } from '../lib/extensiones';
+  import { desplazar } from '../lib/autoria';
   import { docAMd, enLineaAMd, mdADoc, mdAEnLinea, tipoDeDoc, type Nodo } from '../lib/markdown';
   import { avisar, pedirTexto } from '../lib/estado.svelte';
   import MenuInsertar from './MenuInsertar.svelte';
@@ -43,6 +44,14 @@
     actual = md;
     editor.commands.setContent(mdADoc(bloque.tipo, md) as never, { emitUpdate: false });
     marcarVacio();
+    marcarAutoria(md);
+  }
+
+  // Los rangos del servidor se desplazan hasta el Markdown que se pone, por si cambió (p. ej. al unir bloques).
+  function marcarAutoria(md: string) {
+    if (!editor) return;
+    const rangos = variante ? desplazar(variante.autoria, variante.contenido, md) : [];
+    editor.view.dispatch(editor.state.tr.setMeta(claveAutoria, { raw: md, rangos }));
   }
 
   function textoFinal(): number {
@@ -144,6 +153,7 @@
           alSalirArriba: () => (ctl.moverFoco(bloque.id, -1), true),
           alSalirAbajo: () => (ctl.moverFoco(bloque.id, 1), true),
         }),
+        AutoriaIa,
       ],
       content: mdADoc(bloque.tipo, variante?.contenido ?? '') as never,
       onUpdate: ({ editor: e }) => {
@@ -169,6 +179,7 @@
     mostrada = variante?.id ?? '';
     actual = variante?.contenido ?? '';
     marcarVacio();
+    marcarAutoria(actual);
     return ctl.registrar(bloque.id, {
       enfocar: (donde) => editor?.commands.focus(donde === 'inicio' ? 'start' : 'end'),
       anexar: (md) => {

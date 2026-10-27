@@ -31,6 +31,10 @@ Artículo → Idioma (es | en) → Rama → Sección → Variante de sección �
 - Los **medios** se citan como `medio:<id>`: `![alt](medio:ID)` para una imagen y `<audio src="medio:ID" title="…" controls></audio>` para un audio.
 - El **orden** usa posiciones fraccionarias (`posicion`, un texto que se ordena como tal). Para insertar o mover se mandan los vecinos: `{"antes": id | null, "despues": id | null}`. Si solo hay uno, el elemento queda pegado a él. Sin ninguno, va al final.
 - `origen` de una variante: `tu`, `ia:<nombre>` o `conflicto`. Editarla la convierte en `tu`.
+- **`autoria`** de cada variante de bloque: la lista de partes del texto que vienen de una propuesta del agente ya aceptada. Cada parte es `{"desde", "hasta", "agente"}`. Ejemplo: `"autoria": [{"desde": 6, "hasta": 13, "agente": "claude"}]`. La lista va vacía si no hay ninguna.
+  - `desde` y `hasta` son posiciones en el `contenido` crudo, con sus marcas. Cuentan **caracteres** (puntos de código Unicode), no bytes. `desde` va incluido y `hasta` excluido. Para leer el texto, cuenta igual que el servidor: un carácter por punto de código.
+  - `agente` es el nombre de la marca `{>>ia:nombre<<}` de la propuesta aceptada.
+  - El Markdown no cambia: estas partes se guardan aparte, en la tabla `autoria_ia`.
 
 ## Rutas
 
@@ -99,6 +103,15 @@ Tipos de bloque: `parrafo`, `subtitulo`, `lista`, `cita`, `codigo`, `imagen`, `a
 **El historial agrupa.** Los guardados seguidos del mismo dispositivo durante 10 minutos cuentan como una sola sesión de edición: solo el primero deja entrada. Restaurar siempre deja entrada, así que también se puede deshacer.
 
 **`indice` de una marca** cuenta solo las marcas del bloque, en orden y desde 0: tachados, añadidos, cambios y notas. El texto normal y el `{==ancla==}` de una nota no cuentan.
+
+**La autoría sigue al texto.** Cada vez que cambia el `contenido` de una variante, sus rangos `autoria` se recalculan:
+- Se busca el texto igual al principio y al final del texto viejo y del nuevo.
+- Lo que va antes del cambio se queda igual. Lo que va después se desplaza.
+- Lo que toca el cambio se recorta a lo que sigue intacto. Un rango que queda vacío se borra.
+
+Aceptar un añadido o un cambio del agente añade su rango, en las posiciones del texto nuevo. Aceptar un borrado del agente no añade nada. Un guardado que llega como `conflicto` no lleva rangos.
+
+**Copias de bloques.** Copiar un bloque, una sección o una rama con el texto tal cual copia también sus rangos. Si `POST /api/bloques/{id}/variantes` trae otro `contenido`, los rangos se recalculan como en una edición.
 
 ### Etiquetas, series y medios
 
@@ -171,7 +184,7 @@ La app trabaja sin conexión: guarda una copia y una cola de cambios. La lógica
 
 | Método y ruta | Cuerpo | Devuelve |
 |---|---|---|
-| `GET /api/sync?desde=N` | | `{rev, tablas: {series, etiquetas, articulos, idiomas, ramas, secciones, variantes_seccion, bloques, variantes_bloque, medios, canales, publicaciones}}`. Cada tabla trae sus filas con `rev > N`, lápidas incluidas (`borrado: 1`). Sin `desde`, todo. `articulos` trae además `etiquetas` (ids) |
+| `GET /api/sync?desde=N` | | `{rev, tablas: {series, etiquetas, articulos, idiomas, ramas, secciones, variantes_seccion, bloques, variantes_bloque, medios, canales, publicaciones}}`. Cada tabla trae sus filas con `rev > N`, lápidas incluidas (`borrado: 1`). Sin `desde`, todo. `articulos` trae además `etiquetas` (ids). `variantes_bloque` trae además `autoria` en cada fila (ver arriba) |
 | `POST /api/sync` | `{operaciones: [Op]}`, con `X-Tinta-Dispositivo: android` | `{resultados: [{ok, error?, reintentar?, …}], rev}`, uno por operación y en orden |
 
 **Operaciones** (campo `op`):

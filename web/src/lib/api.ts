@@ -104,7 +104,8 @@ export interface Publicacion {
 export interface Plan {
   canal_id: string;
   formato: string;
-  fecha: string;
+  /** Sin fecha, queda como idea. */
+  fecha: string | null;
   hora: string | null;
 }
 export interface CambioPublicacion {

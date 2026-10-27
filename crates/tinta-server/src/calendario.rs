@@ -441,7 +441,9 @@ pub fn borrar_publicacion(c: &mut Connection, id: &str) -> Res<()> {
 pub struct Plan {
     pub canal_id: String,
     pub formato: String,
-    pub fecha: String,
+    /// Sin fecha, la publicación queda como idea en la pestaña «Ideas».
+    #[serde(default)]
+    pub fecha: Option<String>,
     pub hora: Option<String>,
 }
 
@@ -470,7 +472,7 @@ pub fn planear_difusion(c: &mut Connection, articulo_id: &str, planes: Vec<Plan>
             NuevaPublicacion {
                 canal_id: Some(p.canal_id),
                 formato: Some(p.formato),
-                fecha: Some(p.fecha),
+                fecha: p.fecha,
                 hora: p.hora,
                 estado: "idea".into(),
                 titulo: titulo.clone(),
@@ -577,13 +579,16 @@ mod pruebas {
             &mut c,
             &a.id,
             vec![
-                Plan { canal_id: "portfolio".into(), formato: "articulo".into(), fecha: "2026-11-02".into(), hora: None },
-                Plan { canal_id: "x".into(), formato: "hilo".into(), fecha: "2026-11-03".into(), hora: Some("18:00".into()) },
+                Plan { canal_id: "portfolio".into(), formato: "articulo".into(), fecha: Some("2026-11-02".into()), hora: None },
+                Plan { canal_id: "x".into(), formato: "hilo".into(), fecha: Some("2026-11-03".into()), hora: Some("18:00".into()) },
+                Plan { canal_id: "linkedin".into(), formato: "post".into(), fecha: None, hora: None },
             ],
         )
         .unwrap();
-        assert_eq!(ps.len(), 2);
+        assert_eq!(ps.len(), 3);
         assert_eq!(ps[1].partes[0].texto, "Un contenedor para todo");
+        // Sin fecha queda como idea, con su canal.
+        assert_eq!((ps[2].fecha.as_deref(), ps[2].canal_id.as_deref(), ps[2].estado.as_str()), (None, Some("linkedin"), "idea"));
         assert_eq!(ps[0].partes[0].texto, "");
         assert_eq!(ps[1].articulo.as_ref().unwrap().titulo, "llama-swap");
         // La publicación del portfolio fija la fecha del artículo, y moverla la mueve.

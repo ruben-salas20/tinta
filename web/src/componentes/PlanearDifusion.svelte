@@ -42,7 +42,7 @@
 
   api.publicaciones({ articulo: art.id }).then((x) => (existentes = x)).catch(fallo);
 
-  const elegidas = $derived(filas.filter((f) => f.usar && f.fecha));
+  const elegidas = $derived(filas.filter((f) => f.usar));
   const titulo = (art.idiomas.find((i) => i.idioma === 'es') ?? art.idiomas[0])?.titulo || 'Sin título';
 
   async function planear() {
@@ -50,7 +50,7 @@
     try {
       hechas = await api.difusion(
         art.id,
-        elegidas.map((f) => ({ canal_id: f.canal_id, formato: f.formato, fecha: f.fecha, hora: f.hora || null })),
+        elegidas.map((f) => ({ canal_id: f.canal_id, formato: f.formato, fecha: f.fecha || null, hora: (f.fecha && f.hora) || null })),
       );
       difusion.version++;
       recargarCatalogo();
@@ -104,11 +104,14 @@
                 {#each c?.formatos ?? [] as fo (fo.id)}<option value={fo.id}>{fo.nombre}</option>{/each}
               </select>
               <input class="campo" type="date" bind:value={f.fecha} disabled={!f.usar} aria-label="Fecha en {c?.nombre}" />
-              <input class="campo" type="time" bind:value={f.hora} disabled={!f.usar} aria-label="Hora en {c?.nombre}" />
+              <input class="campo" type="time" bind:value={f.hora} disabled={!f.usar || !f.fecha} aria-label="Hora en {c?.nombre}" />
             </label>
           {/each}
         </div>
-        {#if elegidas.some((f) => f.canal_id === 'portfolio')}
+        {#if elegidas.some((f) => !f.fecha)}
+          <p class="nota">Las que van sin fecha quedan en la pestaña «Ideas» del calendario.</p>
+        {/if}
+        {#if elegidas.some((f) => f.canal_id === 'portfolio' && f.fecha)}
           <p class="nota">La fecha del portfolio pasa a ser la del artículo: es la que lleva su <code>.md</code>.</p>
         {/if}
         <div class="v-pie">

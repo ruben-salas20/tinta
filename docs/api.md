@@ -145,7 +145,7 @@ Las fechas van en `AAAA-MM-DD` y las horas en `HH:MM`, en la hora local de Rubé
 | `GET /api/publicaciones/{id}` | | `Publicacion` |
 | `PATCH /api/publicaciones/{id}` | Cualquier campo de los de crear, más `enlace`. `null` vacía `fecha` (y con ella `hora`), `canal_id` (y con él `formato`), `hora`, `articulo_id` o `enlace` | `Publicacion` |
 | `DELETE /api/publicaciones/{id}` | | 204 |
-| `POST /api/articulos/{id}/difusion` | `[{canal_id, formato, fecha, hora?}]` | 201 y las publicaciones nuevas, en estado `idea` con el título del artículo. Salvo en el portfolio, su texto empieza con la descripción |
+| `POST /api/articulos/{id}/difusion` | `[{canal_id, formato, fecha?, hora?}]` | 201 y las publicaciones nuevas, en estado `idea` con el título del artículo. Sin `fecha` quedan como ideas, en la pestaña «Ideas». Salvo en el portfolio, su texto empieza con la descripción |
 
 - **Estados:** `idea`, `preparando`, `programada` y `publicada`.
 - **Ideas sin fecha ni canal:** una publicación puede no tener `fecha` ni `canal_id`. Sin fecha, solo puede estar en `idea` o `preparando`. Sin canal, no tiene `formato` y admite cuantas partes quiera.

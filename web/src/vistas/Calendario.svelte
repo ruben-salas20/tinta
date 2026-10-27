@@ -107,11 +107,12 @@
     }
   }
 
-  // Una idea nace sin fecha ni canal. Con un canal filtrado no se ve en la lista, pero sí se abre.
+  // Una idea nace sin fecha. Con un canal filtrado nace en ese canal, para que se vea en la lista.
   async function nuevaIdea() {
+    const c = canal(filtroCanal ?? '');
     try {
-      const p = await api.crearPublicacion({ estado: 'idea' });
-      if (!filtroCanal) ideas = [p, ...ideas];
+      const p = await api.crearPublicacion(c ? { estado: 'idea', canal_id: c.id, formato: c.formatos[0]?.id } : { estado: 'idea' });
+      ideas = [p, ...ideas];
       elegida = p.id;
     } catch (e) {
       fallo(e);
@@ -285,7 +286,7 @@
           </div>
         {:else if vista === 'ideas'}
           {#if !ideas.length}
-            <div class="vacio-centro"><p>No hay ideas sin fecha.{filtroCanal ? '' : ' Crea una con «Nueva idea».'}</p></div>
+            <div class="vacio-centro"><p>No hay ideas sin fecha. Crea una con «Nueva idea».</p></div>
           {:else}
             <div class="lista-ideas">
               {#each ideas as p (p.id)}

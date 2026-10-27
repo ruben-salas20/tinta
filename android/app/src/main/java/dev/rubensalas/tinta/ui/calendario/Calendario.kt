@@ -77,6 +77,7 @@ import dev.rubensalas.tinta.data.local.PublicacionE
 import dev.rubensalas.tinta.ui.comun.BotonCrear
 import dev.rubensalas.tinta.ui.comun.Cabecera
 import dev.rubensalas.tinta.ui.comun.Chip
+import dev.rubensalas.tinta.ui.comun.ChipEstado
 import dev.rubensalas.tinta.ui.comun.FilaPublicacion
 import dev.rubensalas.tinta.ui.comun.Grupo
 import dev.rubensalas.tinta.ui.comun.IconoRed
@@ -100,25 +101,31 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** La agenda: lo atrasado arriba y después cada día con algo, de hoy en adelante. «Mes» muestra una cuadrícula. */
+/**
+ * La agenda: lo atrasado arriba y después cada día con algo, de hoy en adelante. «Mes» muestra una cuadrícula.
+ * «Ideas» lista las publicaciones sin fecha; su + crea una idea nueva.
+ */
 @Composable
-fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit, onNueva: () -> Unit, vistaInicial: String = "semana") {
+fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit, onNueva: () -> Unit, onNuevaIdea: () -> Unit, vistaInicial: String = "semana") {
     val c = Tinta.colores
     var vista by rememberSaveable { mutableStateOf(vistaInicial) }
     val d = hoy.toString()
-    val atrasadas = datos.publicaciones.filter { it.fecha < d && it.estado != "publicada" }.sortedWith(Datos.ORDEN)
-    val dias = datos.publicaciones.filter { it.fecha >= d }.sortedWith(Datos.ORDEN).groupBy { it.fecha }
-    val recientes = datos.publicaciones.filter { it.fecha < d && it.fecha >= hoy.minusDays(14).toString() && it.estado == "publicada" }
-        .sortedWith(Datos.ORDEN).reversed()
+    val atrasadas = datos.publicaciones.filter { p -> p.fecha?.let { it < d } == true && p.estado != "publicada" }.sortedWith(Datos.ORDEN)
+    val dias = datos.publicaciones.filter { p -> p.fecha?.let { it >= d } == true }.sortedWith(Datos.ORDEN).porDia()
+    val recientes = datos.publicaciones.filter { p ->
+        p.fecha?.let { it < d && it >= hoy.minusDays(14).toString() } == true && p.estado == "publicada"
+    }.sortedWith(Datos.ORDEN).reversed()
     Box(Modifier.fillMaxSize().background(c.papel)) {
         Column(Modifier.fillMaxSize()) {
             Cabecera("Calendario")
             Row(Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip("Semana", lleno = vista == "semana", onClick = { vista = "semana" })
                 Chip("Mes", lleno = vista == "mes", onClick = { vista = "mes" })
+                Chip("Ideas", lleno = vista == "ideas", onClick = { vista = "ideas" })
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 96.dp)) {
                 if (vista == "mes") Mes(datos, hoy, onPublicacion)
+                else if (vista == "ideas") Ideas(datos, onPublicacion)
                 else {
                     if (atrasadas.isNotEmpty()) {
                         Grupo("Atrasadas")
@@ -139,7 +146,29 @@ fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> 
                 }
             }
         }
-        BotonCrear(Modifier.align(Alignment.BottomEnd).padding(18.dp), onClick = onNueva)
+        BotonCrear(Modifier.align(Alignment.BottomEnd).padding(18.dp), onClick = if (vista == "ideas") onNuevaIdea else onNueva)
+    }
+}
+
+/** Las publicaciones sin fecha, de la más reciente a la más antigua. Tocar una abre su detalle. */
+@Composable
+private fun Ideas(datos: Datos, onPublicacion: (String) -> Unit) {
+    val c = Tinta.colores
+    val ideas = datos.ideas()
+    Grupo("Sin fecha")
+    if (ideas.isEmpty()) Text("No hay ideas sin fecha. Pulsa + para anotar una.", style = Estilos.ui, color = c.secundario)
+    else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        for (p in ideas) {
+            val canal = datos.canal(p.canalId)
+            Tarjeta(onClick = { onPublicacion(p.id) }) {
+                Text(Datos.tituloDe(p), style = Estilos.tarjetaTitulo, color = c.texto, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ChipEstado(p.estado)
+                    if (canal != null) IconoRed(canal.icono, tam = 13.dp)
+                    Text(canal?.nombre ?: "Sin canal", Modifier.weight(1f), style = Estilos.uiPeque, color = c.secundario, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
     }
 }
 
@@ -150,7 +179,7 @@ private fun Mes(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit) {
     var mes by rememberSaveable { mutableStateOf(YearMonth.from(hoy).toString()) }
     var elegido by rememberSaveable { mutableStateOf<String?>(hoy.toString()) }
     val actual = YearMonth.parse(mes)
-    val porDia = datos.publicaciones.sortedWith(Datos.ORDEN).groupBy { it.fecha }
+    val porDia = datos.publicaciones.sortedWith(Datos.ORDEN).porDia()
     val primero = actual.atDay(1)
     val inicio = primero.minusDays(primero.dayOfWeek.value - 1L)
     val titulo = actual.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es"))).replaceFirstChar { it.uppercase() }
@@ -225,7 +254,7 @@ private fun Dia(d: LocalDate?, ps: List<PublicacionE>, datos: Datos, onPublicaci
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             for (p in ps) {
-                val extra = if (conFecha) fecha(p.fecha)?.let(::fechaCorta) else p.hora
+                val extra = if (conFecha) p.fecha?.let(::fecha)?.let(::fechaCorta) else p.hora
                 FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, extra) { onPublicacion(p.id) }
             }
         }
@@ -259,6 +288,10 @@ private fun DiaPorHora(d: LocalDate?, ps: List<PublicacionE>, datos: Datos, onPu
     }
 }
 
+/** Las publicaciones con fecha, agrupadas por día («AAAA-MM-DD»). Las ideas no tienen día y se quedan fuera. */
+private fun List<PublicacionE>.porDia(): Map<String, List<PublicacionE>> =
+    mapNotNull { p -> p.fecha?.let { it to p } }.groupBy({ it.first }, { it.second })
+
 /** Lo que el detalle de una publicación pide a la app. */
 interface AccionesPublicacion {
     fun cambiar(campos: Map<String, String?>)
@@ -283,6 +316,10 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
     }
     val canal = datos.canal(p.canalId)
     val formato = canal?.formatos?.firstOrNull { it.id == p.formato }
+    // Con fecha y canal se puede programar y publicar. Sin ellas, la publicación es una idea.
+    val conFechaYCanal = p.fecha != null && p.canalId != null
+    // Programada y publicada exigen fecha y canal: mientras estén, no se quitan.
+    val fijada = p.estado == "programada" || p.estado == "publicada"
     var partes by remember(p.id) { mutableStateOf(p.partes.ifEmpty { listOf(Parte()) }) }
     var titulo by remember(p.id) { mutableStateOf(p.titulo) }
     var elegirFecha by remember { mutableStateOf(false) }
@@ -307,20 +344,45 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             Tarjeta {
-                Campo("Fecha") { Text(fecha(p.fecha)?.let(::fechaCorta) ?: p.fecha, Modifier.clickable { elegirFecha = true }, style = Estilos.ui, color = c.texto) }
-                HorizontalDivider(color = c.linea)
-                Campo("Hora") {
-                    Text(p.hora ?: "Sin hora", Modifier.clickable { elegirHora = true }, style = Estilos.ui, color = if (p.hora == null) c.tenue else c.texto)
-                    if (p.hora != null) Text("Quitar", Modifier.padding(start = 12.dp).clickable { acciones.cambiar(mapOf("hora" to null)) }, style = Estilos.uiPeque, color = c.secundario)
+                Campo("Fecha") {
+                    val f = p.fecha
+                    if (f == null) Text("Elegir fecha", Modifier.clickable { elegirFecha = true }, style = Estilos.ui, color = c.tenue)
+                    else {
+                        Text(fecha(f)?.let(::fechaCorta) ?: f, Modifier.clickable { elegirFecha = true }, style = Estilos.ui, color = c.texto)
+                        if (!fijada) Text("Quitar", Modifier.padding(start = 12.dp).clickable { acciones.cambiar(mapOf("fecha" to null)) }, style = Estilos.uiPeque, color = c.secundario)
+                    }
                 }
                 HorizontalDivider(color = c.linea)
-                Campo("Formato") {
+                Campo("Hora") {
+                    if (p.fecha == null) Text("Pon una fecha antes", style = Estilos.ui, color = c.tenue)
+                    else {
+                        Text(p.hora ?: "Sin hora", Modifier.clickable { elegirHora = true }, style = Estilos.ui, color = if (p.hora == null) c.tenue else c.texto)
+                        if (p.hora != null) Text("Quitar", Modifier.padding(start = 12.dp).clickable { acciones.cambiar(mapOf("hora" to null)) }, style = Estilos.uiPeque, color = c.secundario)
+                    }
+                }
+                HorizontalDivider(color = c.linea)
+                Campo("Canal") {
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (f in canal?.formatos.orEmpty()) Chip(f.nombre, lleno = f.id == p.formato, onClick = {
-                            val nuevas = if (!f.partes && partes.size > 1) listOf(Parte(partes.joinToString("\n\n") { it.texto }, partes.flatMap { it.medios })) else null
-                            acciones.cambiar(mapOf("formato" to f.id))
-                            if (nuevas != null) partes = nuevas
-                        })
+                        if (canal == null) Text("Sin canal", style = Estilos.ui, color = c.tenue)
+                        // El canal y su formato van juntos: al elegir un canal se toma su primer formato.
+                        for (k in datos.canales.filter { (it.activo == 1 && it.formatos.isNotEmpty()) || it.id == p.canalId }) Chip(
+                            k.nombre, lleno = k.id == p.canalId,
+                            onClick = { acciones.cambiar(mapOf("canal_id" to k.id, "formato" to k.formatos.firstOrNull()?.id)) },
+                            icono = { IconoRed(k.icono, tam = 13.dp, color = if (k.id == p.canalId) c.sobreTinta else c.texto) },
+                        )
+                    }
+                    if (canal != null && !fijada) Text("Quitar", Modifier.padding(start = 12.dp).clickable { acciones.cambiar(mapOf("canal_id" to null)) }, style = Estilos.uiPeque, color = c.secundario)
+                }
+                if (canal != null) {
+                    HorizontalDivider(color = c.linea)
+                    Campo("Formato") {
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (f in canal.formatos) Chip(f.nombre, lleno = f.id == p.formato, onClick = {
+                                val nuevas = if (!f.partes && partes.size > 1) listOf(Parte(partes.joinToString("\n\n") { it.texto }, partes.flatMap { it.medios })) else null
+                                acciones.cambiar(mapOf("formato" to f.id))
+                                if (nuevas != null) partes = nuevas
+                            })
+                        }
                     }
                 }
                 HorizontalDivider(color = c.linea)
@@ -329,12 +391,14 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
                         for (e in ESTADOS_PUB) {
                             val sel = e == p.estado
                             val col = c.estado(e)
+                            val permitido = Datos.estadoPermitido(e, p)
                             Text(
                                 NOMBRE_ESTADO[e] ?: e,
                                 Modifier.clip(RoundedCornerShape(6.dp))
                                     .background(if (sel) mezcla(col, 0.14f, c.hoja) else c.hoja)
                                     .border(1.dp, if (sel) col else c.linea, RoundedCornerShape(6.dp))
-                                    .clickable { if (e == "publicada") pedirEnlace = true else acciones.cambiar(mapOf("estado" to e)) }
+                                    .alpha(if (permitido) 1f else 0.4f)
+                                    .clickable(enabled = permitido) { if (e == "publicada") pedirEnlace = true else acciones.cambiar(mapOf("estado" to e)) }
                                     .padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = Estilos.uiPeque, color = if (sel) c.texto else c.secundario,
                             )
@@ -375,7 +439,7 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
             Row(Modifier.padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BotonPildora("Copiar post 1", Modifier.weight(1f), onClick = { acciones.copiar(partes.firstOrNull()?.texto.orEmpty()) },
                     icono = { Icon(Icons.Outlined.ContentCopy, null, Modifier.size(16.dp), tint = c.texto) })
-                BotonPildora("Publicada", Modifier.weight(1f), principal = true, onClick = { pedirEnlace = true },
+                BotonPildora("Publicada", Modifier.weight(1f).alpha(if (conFechaYCanal) 1f else 0.4f), principal = true, onClick = { if (conFechaYCanal) pedirEnlace = true },
                     icono = { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp), tint = c.sobreTinta) })
             }
             Text("Tinta no publica por ti: copia el texto, publícalo en la red y marca aquí que salió.", Modifier.padding(bottom = 24.dp), style = Estilos.uiPeque, color = c.tenue)
@@ -383,7 +447,7 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
     }
 
     if (elegirFecha) {
-        val inicial = fecha(p.fecha)?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+        val inicial = p.fecha?.let(::fecha)?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
         val estado = rememberDatePickerState(initialSelectedDateMillis = inicial)
         DatePickerDialog(
             onDismissRequest = { elegirFecha = false },

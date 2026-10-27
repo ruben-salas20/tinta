@@ -119,7 +119,7 @@ fun PantallaArticulos(datos: Datos, hoy: LocalDate, onArticulo: (String) -> Unit
                             if (s.conflictos > 0) Senal(Icons.Outlined.CallSplit, s.conflictos)
                             if (p != null) {
                                 IconoRed(datos.canal(p.canalId)?.icono ?: "", tam = 13.dp)
-                                Text(cuando(p.fecha, hoy), style = Estilos.uiPeque, color = c.secundario, maxLines = 1, softWrap = false)
+                                Text(p.fecha?.let { cuando(it, hoy) }.orEmpty(), style = Estilos.uiPeque, color = c.secundario, maxLines = 1, softWrap = false)
                             }
                         }
                     }

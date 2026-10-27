@@ -169,9 +169,13 @@ data class RangoAutoria(val desde: Int, val hasta: Int, val agente: String)
 @Entity(tableName = "publicaciones")
 data class PublicacionE(
     @PrimaryKey val id: String,
-    @SerialName("canal_id") @ColumnInfo(name = "canal_id") val canalId: String,
-    val formato: String,
-    val fecha: String,
+    /** Nulo mientras la publicación sea una idea sin canal. */
+    @SerialName("canal_id") @ColumnInfo(name = "canal_id") val canalId: String?,
+    /** Nulo si y solo si [canalId] es nulo. */
+    val formato: String?,
+    /** Nulo mientras la publicación sea una idea sin fecha. */
+    val fecha: String?,
+    /** Nula si no hay fecha. */
     val hora: String? = null,
     val estado: String = "idea",
     val titulo: String = "",

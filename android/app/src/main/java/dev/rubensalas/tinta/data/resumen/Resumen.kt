@@ -19,18 +19,19 @@ data class Resumen(
     }
 
     /** Una línea por publicación: hoy primero, luego lo atrasado. */
-    fun lineas(nombreCanal: (String) -> String): List<String> =
+    fun lineas(nombreCanal: (String?) -> String): List<String> =
         hoy.map { "${it.hora ?: "Hoy"} · ${nombreCanal(it.canalId)} · ${it.titulo.ifBlank { "Sin título" }}" } +
             atrasadas.map { "Atrasada (${it.fecha}) · ${nombreCanal(it.canalId)} · ${it.titulo.ifBlank { "Sin título" }}" }
 
     companion object {
+        /** Las ideas sin fecha no entran: no tienen día que avisar. */
         fun calcular(publicaciones: List<PublicacionE>, hoy: LocalDate): Resumen {
-            val vivas = publicaciones.filter { it.borrado == 0 && it.estado != "publicada" }
+            val vivas = publicaciones.filter { it.borrado == 0 && it.estado != "publicada" && it.fecha != null }
             val d = hoy.toString()
             val orden = compareBy<PublicacionE>({ it.fecha }, { it.hora == null }, { it.hora })
             return Resumen(
                 hoy = vivas.filter { it.fecha == d }.sortedWith(orden),
-                atrasadas = vivas.filter { it.fecha < d }.sortedWith(orden),
+                atrasadas = vivas.filter { it.fecha?.let { f -> f < d } == true }.sortedWith(orden),
                 manana = vivas.filter { it.fecha == hoy.plusDays(1).toString() }.sortedWith(orden),
             )
         }

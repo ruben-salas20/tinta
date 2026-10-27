@@ -33,6 +33,9 @@ object Muestras {
     private fun pub(id: String, canal: String, fecha: String, estado: String, titulo: String, hora: String? = null, formato: String = "post", partes: List<Parte> = listOf(Parte())) =
         PublicacionE(id, canal, formato, fecha, hora, estado, titulo, partes, creado = "", cambiado = "", rev = 1)
 
+    private fun idea(id: String, titulo: String, estado: String, canal: String?, cambiado: String, texto: String = "") =
+        PublicacionE(id, canal, canal?.let { "post" }, null, null, estado, titulo, listOf(Parte(texto)), creado = "", cambiado = cambiado, rev = 1)
+
     val canales = listOf(
         CanalE("x", "X", "x", listOf(Formato("post", "Post", 280), Formato("hilo", "Hilo", 280, true), Formato("articulo", "Artículo")), 1, "a", 1),
         CanalE("linkedin", "LinkedIn", "linkedin", listOf(Formato("post", "Post", 3000)), 1, "b", 1),
@@ -98,6 +101,8 @@ object Muestras {
             hilo,
             pub("p6", "x", "2026-10-22", "publicada", "Por qué monté una torre en casa"),
             pub("p7", "linkedin", "2026-10-24", "preparando", "Montando ai-lab: el hardware"),
+            idea("i1", "Por qué el móvil no debería guardar mi clave", "idea", null, "2026-10-26T09:00:00Z"),
+            idea("i2", "", "preparando", "linkedin", "2026-10-20T09:00:00Z", "Dos cosas que aprendí al migrar la base de datos del móvil."),
         ),
         pendientes = 3,
     )

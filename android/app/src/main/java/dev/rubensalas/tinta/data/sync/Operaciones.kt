@@ -400,22 +400,27 @@ class Local(private val dao: DaoTinta) {
         if (dao.publicacion(id) != null) return
         val p = o["publicacion"]!!.jsonObject
         val t = ahora()
-        val base = PublicacionE(id, p.texto("canal_id")!!, p.texto("formato")!!, p.texto("fecha")!!, creado = t, cambiado = t, rev = -1)
+        val base = PublicacionE(id, canalId = null, formato = null, fecha = null, creado = t, cambiado = t, rev = -1)
         dao.publicaciones(listOf(cambiar(base, p)))
     }
 
-    private fun cambiar(p: PublicacionE, c: JsonObject): PublicacionE = p.copy(
-        canalId = c.texto("canal_id") ?: p.canalId,
-        formato = c.texto("formato") ?: p.formato,
-        fecha = c.texto("fecha") ?: p.fecha,
-        hora = if ("hora" in c) c.texto("hora") else p.hora,
-        estado = c.texto("estado") ?: p.estado,
-        titulo = c.texto("titulo") ?: p.titulo,
-        partes = c["partes"]?.let { json.decodeFromJsonElement(ListSerializer(Parte.serializer()), it) } ?: p.partes,
-        articuloId = if ("articulo_id" in c) c.texto("articulo_id") else p.articuloId,
-        enlace = if ("enlace" in c) c.texto("enlace") else p.enlace,
-        cambiado = ahora(),
-    )
+    /** Como `modelo::cambiar_publicacion`: quitar la fecha quita la hora, y quitar el canal quita el formato. */
+    private fun cambiar(p: PublicacionE, c: JsonObject): PublicacionE {
+        val canal = if ("canal_id" in c) c.texto("canal_id") else p.canalId
+        val fecha = if ("fecha" in c) c.texto("fecha") else p.fecha
+        return p.copy(
+            canalId = canal,
+            formato = if (canal == null) null else c.texto("formato") ?: p.formato,
+            fecha = fecha,
+            hora = if (fecha == null) null else if ("hora" in c) c.texto("hora") else p.hora,
+            estado = c.texto("estado") ?: p.estado,
+            titulo = c.texto("titulo") ?: p.titulo,
+            partes = c["partes"]?.let { json.decodeFromJsonElement(ListSerializer(Parte.serializer()), it) } ?: p.partes,
+            articuloId = if ("articulo_id" in c) c.texto("articulo_id") else p.articuloId,
+            enlace = if ("enlace" in c) c.texto("enlace") else p.enlace,
+            cambiado = ahora(),
+        )
+    }
 }
 
 /** La cola de cambios pendientes de enviar. */

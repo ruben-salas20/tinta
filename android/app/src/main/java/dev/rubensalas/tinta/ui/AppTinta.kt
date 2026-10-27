@@ -247,7 +247,10 @@ fun AppTinta(c: Contenedor) {
                     PantallaArticulos(datos, hoy, onArticulo = { nav.navigate("editor/$it") }, onNuevo = { nuevoArticulo() }, onEliminar = { porEliminar = it })
                 }
                 composable(Seccion.Calendario.name) {
-                    PantallaCalendario(datos, hoy, onPublicacion = { nav.navigate("publicacion/$it") }, onNueva = { nuevaPublicacion = true })
+                    PantallaCalendario(
+                        datos, hoy, onPublicacion = { nav.navigate("publicacion/$it") }, onNueva = { nuevaPublicacion = true },
+                        onNuevaIdea = { scope.launch { nav.navigate("publicacion/${repo.crearPublicacion(null, null, null, null, "", null)}") } },
+                    )
                 }
                 composable(Seccion.Ajustes.name) {
                     var estadoVersion by remember { mutableStateOf<String?>(null) }

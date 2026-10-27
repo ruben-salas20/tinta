@@ -2,7 +2,7 @@
 
 Tinta es un servicio de ai-lab para dos cosas: planear publicaciones en redes y escribir artículos con orden. Lo abres en el navegador del portátil y en una app de Android. Los dos ven los mismos datos porque los guarda el servicio de la torre.
 
-Estado: **borrador del plan, pendiente de tu revisión.** Después vienen las maquetas y, con las dos cosas aprobadas, la construcción.
+Estado: **hecho.** Las cinco fases están terminadas desde el 2026-10-26, con la app de Android 0.2.0. Las mejoras pendientes están en los issues del repositorio.
 
 ## 1. Decisiones tomadas
 
@@ -15,7 +15,7 @@ Estado: **borrador del plan, pendiente de tu revisión.** Después vienen las ma
 | Móvil | App nativa de Android, en Kotlin con Jetpack Compose (la biblioteca de Google para dibujar pantallas) |
 | Sin conexión | La app de Android funciona entera sin red y sincroniza al volver. La web trabaja siempre conectada |
 | Ayuda para escribir | Tinta da orden y estructura, sin IA propia. La IA llega por MCP (el protocolo que deja a Claude u otro agente usar herramientas de Tinta) |
-| Qué puede hacer el agente | Solo proponer. Sus cambios llegan marcados como suyos y tú los aceptas o los descartas |
+| Qué puede hacer el agente | En los artículos, solo proponer: sus cambios llegan marcados como suyos y tú los aceptas o los descartas. En el calendario actúa directamente (ver la sección 7) |
 | Idiomas | Cada artículo tiene versión en español y en inglés, como el portfolio |
 | Repositorio | Público, `ruben-salas20/tinta`. Imagen en GHCR (el registro de imágenes de GitHub) y versiones de la app en GitHub Releases, como Atalaya |
 

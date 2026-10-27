@@ -81,6 +81,37 @@ interface AccionesEditor {
     suspend fun restaurar(varianteId: String, entrada: Long)
     /** Abre la galería; [onElegida] recibe el id del medio ya guardado en el móvil. */
     fun elegirImagen(onElegida: (String) -> Unit)
+
+    // Secciones y bloques
+    /** Devuelve el id del párrafo vacío con el que nace. */
+    suspend fun nuevaSeccion(ramaId: String, despuesDe: String?, titulo: String): String
+    suspend fun cambiarTituloSeccion(vsId: String, titulo: String)
+    suspend fun borrarSeccion(id: String)
+    suspend fun moverSeccion(id: String, antes: String?, despues: String?)
+    suspend fun moverBloque(id: String, antes: String?, despues: String?)
+    suspend fun cambiarTipoBloque(id: String, tipo: String)
+    /** Devuelve el id de la variante nueva. */
+    suspend fun forkSeccion(seccionId: String, desde: String? = null, activar: Boolean = true): String
+    suspend fun activarVarianteSeccion(seccionId: String, vsId: String)
+    suspend fun borrarVarianteSeccion(id: String)
+
+    // Ramas e idiomas
+    /** Devuelve el id de la rama nueva. */
+    suspend fun forkRama(ramaId: String, nombre: String): String
+    suspend fun renombrarRama(id: String, nombre: String)
+    suspend fun borrarRama(id: String)
+    suspend fun hacerPrincipal(idiomaId: String, ramaId: String)
+    /** [copiarDe] es el código del idioma de partida («es»), o null para empezar vacío. Devuelve el id del idioma. */
+    suspend fun crearIdioma(articuloId: String, idioma: String, copiarDe: String?): String
+    suspend fun borrarIdioma(id: String)
+    suspend fun marcarTraducidoIa(idiomaId: String, si: Boolean)
+    suspend fun cambiarDescripcion(idiomaId: String, descripcion: String)
+
+    // Etiquetas y series
+    suspend fun cambiarEtiquetas(articuloId: String, nombres: List<String>)
+    suspend fun cambiarSerie(articuloId: String, serieId: String?, parte: Long?)
+    /** Devuelve el id de la serie nueva. */
+    suspend fun crearSerie(nombre: String): String
 }
 
 private val ESTADOS = listOf("idea", "borrador", "revision", "listo", "publicado")
@@ -107,8 +138,10 @@ fun PantallaEditor(
         Box(Modifier.fillMaxSize().background(c.papel), contentAlignment = Alignment.Center) { Text("Este artículo ya no existe.", color = c.secundario) }
         return
     }
-    val doc = idioma.ramaPrincipalId?.let { datos.documento(it) }.orEmpty()
-    val rama = datos.rama(idioma.ramaPrincipalId)
+    // La rama que se lee: la principal salvo que se elija otra en la hoja de ramas.
+    var ramaElegida by rememberSaveable { mutableStateOf<String?>(null) }
+    val rama = datos.rama(ramaElegida)?.takeIf { it.idiomaId == idioma.id } ?: datos.rama(idioma.ramaPrincipalId)
+    val doc = rama?.let { datos.documento(it.id) }.orEmpty()
 
     var foco by rememberSaveable { mutableStateOf(focoInicial) }
     var hoja by remember { mutableStateOf<Hoja?>(null) }
@@ -173,8 +206,8 @@ fun PantallaEditor(
             ) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", Modifier.size(38.dp).clip(RoundedCornerShape(99.dp)).clickable { enfocar(null); onVolver() }.padding(9.dp), tint = c.texto)
                 Spacer(Modifier.weight(1f))
-                Chip(rama?.nombre ?: "principal")
-                Chip(idioma.idioma.uppercase(), onClick = if (idiomas.size > 1) { { enfocar(null); idiomaElegido = idiomas.first { it.id != idioma.id }.idioma } } else null)
+                Chip(rama?.nombre ?: "principal", onClick = { enfocar(null); hoja = Hoja.Ramas })
+                Chip(idioma.idioma.uppercase(), onClick = { enfocar(null); hoja = Hoja.Idiomas })
                 Box {
                     Icon(Icons.Outlined.MoreHoriz, "Más", Modifier.size(38.dp).clip(RoundedCornerShape(99.dp)).clickable { menu = true }.padding(9.dp), tint = c.texto)
                     DropdownMenu(menu, { menu = false }) {
@@ -192,6 +225,7 @@ fun PantallaEditor(
                             })
                         }
                         HorizontalDivider()
+                        DropdownMenuItem({ Text("Etiquetas y serie") }, { menu = false; enfocar(null); hoja = Hoja.Ficha })
                         DropdownMenuItem({ Text("Eliminar artículo") }, { menu = false; enfocar(null); onEliminar() })
                     }
                 }
@@ -321,12 +355,32 @@ fun PantallaEditor(
                 },
                 onCerrar = { hoja = null },
             )
+            Hoja.Ramas -> HojaRamas(
+                datos = datos,
+                idioma = idioma,
+                ramaVista = rama?.id,
+                acciones = acciones,
+                onElegir = { ramaElegida = it },
+                onCerrar = { hoja = null },
+            )
+            Hoja.Idiomas -> HojaIdiomas(
+                datos = datos,
+                articuloId = a.id,
+                idioma = idioma,
+                acciones = acciones,
+                onElegir = { lengua -> idiomaElegido = lengua; ramaElegida = null },
+                onCerrar = { hoja = null },
+            )
+            Hoja.Ficha -> HojaFicha(datos = datos, articulo = a, acciones = acciones, onCerrar = { hoja = null })
             null -> Unit
         }
     }
 }
 
 sealed interface Hoja {
+    data object Ramas : Hoja
+    data object Idiomas : Hoja
+    data object Ficha : Hoja
     data object Variantes : Hoja
     data object Historial : Hoja
     data class Nota(val desde: Int, val hasta: Int) : Hoja

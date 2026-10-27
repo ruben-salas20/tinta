@@ -107,6 +107,26 @@ object Muestras {
         override suspend fun historial(varianteId: String) = emptyList<EntradaHistorial>()
         override suspend fun restaurar(varianteId: String, entrada: Long) = Unit
         override fun elegirImagen(onElegida: (String) -> Unit) = Unit
+        override suspend fun nuevaSeccion(ramaId: String, despuesDe: String?, titulo: String) = ""
+        override suspend fun cambiarTituloSeccion(vsId: String, titulo: String) = Unit
+        override suspend fun borrarSeccion(id: String) = Unit
+        override suspend fun moverSeccion(id: String, antes: String?, despues: String?) = Unit
+        override suspend fun moverBloque(id: String, antes: String?, despues: String?) = Unit
+        override suspend fun cambiarTipoBloque(id: String, tipo: String) = Unit
+        override suspend fun forkSeccion(seccionId: String, desde: String?, activar: Boolean) = ""
+        override suspend fun activarVarianteSeccion(seccionId: String, vsId: String) = Unit
+        override suspend fun borrarVarianteSeccion(id: String) = Unit
+        override suspend fun forkRama(ramaId: String, nombre: String) = ""
+        override suspend fun renombrarRama(id: String, nombre: String) = Unit
+        override suspend fun borrarRama(id: String) = Unit
+        override suspend fun hacerPrincipal(idiomaId: String, ramaId: String) = Unit
+        override suspend fun crearIdioma(articuloId: String, idioma: String, copiarDe: String?) = ""
+        override suspend fun borrarIdioma(id: String) = Unit
+        override suspend fun marcarTraducidoIa(idiomaId: String, si: Boolean) = Unit
+        override suspend fun cambiarDescripcion(idiomaId: String, descripcion: String) = Unit
+        override suspend fun cambiarEtiquetas(articuloId: String, nombres: List<String>) = Unit
+        override suspend fun cambiarSerie(articuloId: String, serieId: String?, parte: Long?) = Unit
+        override suspend fun crearSerie(nombre: String) = ""
     }
 
     val accionesPublicacion = object : AccionesPublicacion {

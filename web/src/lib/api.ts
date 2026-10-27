@@ -303,6 +303,8 @@ export const api = {
   series: () => get<SerieConCuenta[]>('/series'),
   crearSerie: (nombre: string) => post<Serie>('/series', { nombre }),
 
+  medios: () => get<Medio[]>('/medios'),
+
   async subirMedio(archivo: File): Promise<Medio> {
     const f = new FormData();
     f.append('archivo', archivo);

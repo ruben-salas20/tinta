@@ -28,8 +28,10 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
@@ -57,13 +59,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.rubensalas.tinta.data.Datos
+import dev.rubensalas.tinta.data.calendario.esImagen
 import dev.rubensalas.tinta.data.calendario.longitud
 import dev.rubensalas.tinta.data.calendario.partir
 import dev.rubensalas.tinta.data.local.CanalE
+import dev.rubensalas.tinta.data.local.MedioE
 import dev.rubensalas.tinta.data.local.Parte
 import dev.rubensalas.tinta.data.local.PublicacionE
 import dev.rubensalas.tinta.ui.comun.BotonCrear
@@ -319,7 +324,7 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
             Grupo(if (formato?.partes == true) "Posts del ${formato.nombre.lowercase()}" else "Texto")
             partes.forEachIndexed { i, parte ->
                 EditorParte(
-                    parte, i, partes.size, limite, formato?.partes == true, imagen,
+                    parte, i, partes.size, limite, formato?.partes == true, imagen, datos.medios,
                     onTexto = { t -> partes = partes.toMutableList().also { it[i] = parte.copy(texto = t) } },
                     onCopiar = { acciones.copiar(parte.texto) },
                     onPartir = {
@@ -412,7 +417,7 @@ private fun Campo(etiqueta: String, contenido: @Composable () -> Unit) {
 
 @Composable
 private fun EditorParte(
-    parte: Parte, i: Int, total: Int, limite: Int?, varias: Boolean, imagen: (String) -> Any?,
+    parte: Parte, i: Int, total: Int, limite: Int?, varias: Boolean, imagen: (String) -> Any?, medios: List<MedioE>,
     onTexto: (String) -> Unit, onCopiar: () -> Unit, onPartir: () -> Unit, onQuitar: () -> Unit,
     onSubir: () -> Unit, onBajar: () -> Unit, onImagen: () -> Unit, onQuitarMedio: (String) -> Unit,
 ) {
@@ -430,7 +435,15 @@ private fun EditorParte(
         )
         if (parte.medios.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (m in parte.medios) Box(Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(c.gris).clickable { onQuitarMedio(m) }) {
-                imagen(m)?.let { AsyncImage(it, null, Modifier.fillMaxSize()) }
+                val medio = medios.firstOrNull { it.id == m }
+                if (medio != null && esImagen(medio.tipo)) {
+                    imagen(m)?.let { AsyncImage(it, null, Modifier.fillMaxSize()) }
+                } else {
+                    Column(Modifier.fillMaxSize().padding(horizontal = 3.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Icon(if (medio?.tipo?.startsWith("audio/") == true) Icons.Outlined.MusicNote else Icons.Outlined.InsertDriveFile, null, Modifier.size(16.dp), tint = c.secundario)
+                        Text(medio?.nombre ?: "Medio", style = Estilos.uiPeque.copy(fontSize = 9.sp, lineHeight = 11.sp), color = c.secundario, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                    }
+                }
                 Icon(Icons.Outlined.Close, "Quitar", Modifier.align(Alignment.TopEnd).size(14.dp), tint = c.texto)
             }
         }

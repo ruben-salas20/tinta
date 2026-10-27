@@ -1586,6 +1586,12 @@ pub fn registrar_medio(c: &mut Connection, sha256: &str, nombre: &str, tipo: &st
     medio(c, &id)
 }
 
+pub fn listar_medios(c: &Connection) -> Res<Vec<Medio>> {
+    Ok(c.prepare("SELECT id, sha256, nombre, tipo, tamano, creado FROM medios WHERE borrado = 0 ORDER BY creado")?
+        .query_map([], |r| Ok(Medio { id: r.get(0)?, sha256: r.get(1)?, nombre: r.get(2)?, tipo: r.get(3)?, tamano: r.get(4)?, creado: r.get(5)? }))?
+        .collect::<Result<_, _>>()?)
+}
+
 pub fn medio(c: &Connection, id: &str) -> Res<Medio> {
     c.query_row("SELECT id, sha256, nombre, tipo, tamano, creado FROM medios WHERE id = ?1 AND borrado = 0", params![id], |r| {
         Ok(Medio { id: r.get(0)?, sha256: r.get(1)?, nombre: r.get(2)?, tipo: r.get(3)?, tamano: r.get(4)?, creado: r.get(5)? })

@@ -438,6 +438,10 @@ async fn subir_medio(State(e): State<Estado>, mut m: Multipart) -> R<(StatusCode
     Err(mal("falta el campo «archivo»"))
 }
 
+async fn listar_medios(State(e): State<Estado>) -> R<Json<Vec<modelo::Medio>>> {
+    Ok(Json(e.con(|c| modelo::listar_medios(c))?))
+}
+
 /// Sirve el archivo con su tipo guardado. ServeFile atiende `Range`, que el
 /// reproductor de audio necesita para saltar a un punto.
 async fn medio(State(e): State<Estado>, Path(id): Path<String>, req: Request) -> R<Response> {
@@ -576,7 +580,7 @@ pub fn rutas(e: Estado) -> Router {
         .route("/etiquetas", get(etiquetas))
         .route("/series", get(series).post(crear_serie))
         .route("/series/{id}", axum::routing::patch(renombrar_serie).delete(borrar_serie))
-        .route("/medios", post(subir_medio).layer(DefaultBodyLimit::max(300 * 1024 * 1024)))
+        .route("/medios", get(listar_medios).post(subir_medio).layer(DefaultBodyLimit::max(300 * 1024 * 1024)))
         .route("/medios/{id}", get(medio))
         .route("/hoy", get(hoy))
         .route("/sync", get(sync_bajar).post(sync_subir))
@@ -697,6 +701,17 @@ mod pruebas {
         assert_eq!(res.headers()["content-type"], "audio/mpeg");
         assert!(res.headers()["cache-control"].to_str().unwrap().contains("immutable"));
         assert_eq!(res.into_body().collect().await.unwrap().to_bytes().as_ref(), b"234");
+    }
+
+    #[tokio::test]
+    async fn lista_medios_con_su_tipo() {
+        let (app, e, _d) = app_y_estado();
+        e.con(|c| modelo::registrar_medio(c, "abc", "voz.mp3", "audio/mpeg", 10)).unwrap();
+        let (st, _, b) = pedir(&app, "GET", "/api/medios", None, Some("Bearer clave-app")).await;
+        assert_eq!(st, StatusCode::OK);
+        let v: Value = serde_json::from_slice(&b).unwrap();
+        assert_eq!(v[0]["nombre"], "voz.mp3");
+        assert_eq!(v[0]["tipo"], "audio/mpeg");
     }
 
     #[tokio::test]

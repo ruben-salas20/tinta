@@ -89,6 +89,11 @@ fun HojaFicha(datos: Datos, articulo: ArticuloE, acciones: AccionesEditor, onCer
         if (n.isEmpty()) return
         nombreSerie = ""
         creando = false
+        val existente = datos.series.find { it.nombre.trim().equals(n, ignoreCase = true) }
+        if (existente != null) {
+            if (existente.id != articulo.serieId) scope.launch { acciones.cambiarSerie(articulo.id, existente.id, null) }
+            return
+        }
         scope.launch { acciones.cambiarSerie(articulo.id, acciones.crearSerie(n), null) }
     }
 

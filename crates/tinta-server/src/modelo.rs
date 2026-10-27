@@ -766,6 +766,16 @@ pub fn crear_serie(c: &mut Connection, nombre: &str) -> Res<Serie> {
     if nombre.is_empty() {
         return Err(Error::Invalido("la serie necesita un nombre".into()));
     }
+    // Un id dado viene de la cola de un cliente, que ya apunta sus artículos a
+    // ese id: ahí no se puede reutilizar otra serie aunque se llame igual.
+    if DADOS.with(|d| d.borrow().serie.is_none()) {
+        let clave = nombre.to_lowercase();
+        let mut q = c.prepare("SELECT id, nombre FROM series WHERE borrado = 0 ORDER BY id")?;
+        let series = q.query_map([], |f| Ok(Serie { id: f.get(0)?, nombre: f.get(1)? }))?.collect::<Result<Vec<_>, _>>()?;
+        if let Some(s) = series.into_iter().find(|s| s.nombre.trim().to_lowercase() == clave) {
+            return Ok(s);
+        }
+    }
     let tx = c.transaction()?;
     let rev = siguiente_rev(&tx)?;
     let id = id_para(|d| &mut d.serie);
@@ -1745,6 +1755,7 @@ mod pruebas {
         let mut c = en_memoria();
         let (a, _) = nuevo(&mut c);
         let s = crear_serie(&mut c, "Montando ai-lab").unwrap();
+        assert_eq!(crear_serie(&mut c, "  montando AI-LAB ").unwrap().id, s.id);
         let a = actualizar_articulo(
             &mut c,
             &a.id,
@@ -1761,6 +1772,7 @@ mod pruebas {
         assert_eq!(a.etiquetas, ["ai-lab", "ia"]);
         assert_eq!(a.serie.as_ref().unwrap().nombre, "Montando ai-lab");
         assert_eq!(listar_series(&c).unwrap()[0].articulos, 1);
+        assert_eq!(listar_series(&c).unwrap().len(), 1);
         assert_eq!(listar_etiquetas(&c).unwrap().len(), 2);
         assert!(actualizar_articulo(&mut c, &a.id, CambioArticulo { estado: Some("raro".into()), ..Default::default() }).is_err());
         assert!(actualizar_articulo(&mut c, &a.id, CambioArticulo { fecha: Some(Some("2 nov".into())), ..Default::default() }).is_err());

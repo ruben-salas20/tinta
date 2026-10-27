@@ -51,6 +51,11 @@ class EdicionTest {
         assertNotNull(Edicion.desde("ab", "parrafo").let { assertEquals("ab", it.aMarkup()); it })
     }
 
+    @Test fun subtituloConSaltoQuedaEnUnaLinea() {
+        val e = Edicion.desde("### Hola", "subtitulo").aplicar("Hola\nmundo")!!
+        assertEquals("### Hola mundo", e.aMarkup())
+    }
+
     @Test fun subtituloQuitaYPoneElPrefijo() {
         val e = Edicion.desde("### Hola mundo", "subtitulo")
         assertEquals("Hola mundo", e.texto)

@@ -21,8 +21,12 @@ class Edicion private constructor(
     private val tipo: String,
 ) {
     /** Vuelve a CriticMarkup, con el prefijo de cada línea. */
-    fun aMarkup(): String =
-        if (texto.isEmpty()) "" else aMarkup(texto.split('\n').joinToString("\n") { ponerPrefijo(tipo, it) })
+    fun aMarkup(): String = when {
+        texto.isEmpty() -> ""
+        // Un subtítulo es una sola línea: un salto haría dos títulos.
+        tipo == "subtitulo" -> aMarkup(ponerPrefijo(tipo, texto.replace('\n', ' ')))
+        else -> aMarkup(texto.split('\n').joinToString("\n") { ponerPrefijo(tipo, it) })
+    }
 
     private fun aMarkup(t: String): String {
         val trozos = mutableListOf<Trozo>()
@@ -117,7 +121,7 @@ class Edicion private constructor(
 fun ponerPrefijo(tipo: String, linea: String): String = when (tipo) {
     "subtitulo" -> "### $linea"
     "lista" -> "- $linea"
-    "cita" -> if (linea.isEmpty()) ">" else "> $linea"
+    "cita" -> if (linea.isBlank()) ">" else "> $linea"
     else -> linea
 }
 

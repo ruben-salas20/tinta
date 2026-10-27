@@ -40,6 +40,11 @@ pub struct IdsDados {
     pub variante_bloque: Option<String>,
     pub publicacion: Option<String>,
     pub medio: Option<String>,
+    pub serie: Option<String>,
+    /// Para copias (ramas, idiomas, variantes de sección): cada pieza copiada
+    /// toma el id [`derivado`] de la semilla y del id de su original, que el
+    /// móvil calcula igual sin preguntar al servidor.
+    pub semilla: Option<String>,
 }
 
 thread_local! {
@@ -53,7 +58,19 @@ pub fn id_valido(id: &str) -> bool {
 /// Ejecuta `f` usando los ids dados en lugar de generarlos. Cada uno se usa
 /// una sola vez: la primera pieza de su tipo que se cree.
 pub fn con_ids<T>(ids: IdsDados, f: impl FnOnce() -> Res<T>) -> Res<T> {
-    let todos = [&ids.articulo, &ids.idioma, &ids.rama, &ids.seccion, &ids.variante_seccion, &ids.bloque, &ids.variante_bloque, &ids.publicacion, &ids.medio];
+    let todos = [
+        &ids.articulo,
+        &ids.idioma,
+        &ids.rama,
+        &ids.seccion,
+        &ids.variante_seccion,
+        &ids.bloque,
+        &ids.variante_bloque,
+        &ids.publicacion,
+        &ids.medio,
+        &ids.serie,
+        &ids.semilla,
+    ];
     if let Some(malo) = todos.into_iter().flatten().find(|i| !id_valido(i)) {
         return Err(Error::Invalido(format!("id no válido (24 caracteres hexadecimales en minúscula): {malo}")));
     }
@@ -66,6 +83,17 @@ pub fn con_ids<T>(ids: IdsDados, f: impl FnOnce() -> Res<T>) -> Res<T> {
 /// El id dado para ese tipo de pieza, si lo hay; si no, uno nuevo.
 pub fn id_para(campo: fn(&mut IdsDados) -> &mut Option<String>) -> String {
     DADOS.with(|d| campo(&mut d.borrow_mut()).take()).unwrap_or_else(nuevo_id)
+}
+
+/// Primeros 12 bytes, en hexadecimal, del SHA-256 de `texto`.
+pub fn id_de(texto: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(&Sha256::digest(texto.as_bytes())[..12])
+}
+
+/// Id de la copia de `original`: fijo si hay semilla, nuevo si no.
+fn derivado(original: &str) -> String {
+    DADOS.with(|d| d.borrow().semilla.clone()).map(|s| id_de(&format!("{s}:{original}"))).unwrap_or_else(nuevo_id)
 }
 
 pub fn nuevo_id() -> String {
@@ -511,7 +539,10 @@ fn insertar_seccion(c: &Connection, rama_id: &str, pos: &str, titulo: &str, rev:
 }
 
 fn insertar_variante_seccion(c: &Connection, seccion_id: &str, titulo: &str, origen: &str, rev: i64) -> Res<String> {
-    let id = id_para(|d| &mut d.variante_seccion);
+    insertar_variante_seccion_con(c, id_para(|d| &mut d.variante_seccion), seccion_id, titulo, origen, rev)
+}
+
+fn insertar_variante_seccion_con(c: &Connection, id: String, seccion_id: &str, titulo: &str, origen: &str, rev: i64) -> Res<String> {
     c.execute(
         "INSERT INTO variantes_seccion (id, seccion_id, titulo, origen, creado, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![id, seccion_id, titulo, origen, ahora(), rev],
@@ -530,17 +561,36 @@ fn insertar_bloque(
     rev: i64,
 ) -> Res<(String, String)> {
     let bid = id_para(|d| &mut d.bloque);
+    let vid = id_para(|d| &mut d.variante_bloque);
+    insertar_bloque_con(c, bid, vid, vs_id, pos, tipo, contenido, origen, rev)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insertar_bloque_con(
+    c: &Connection,
+    bid: String,
+    vid: String,
+    vs_id: &str,
+    pos: &str,
+    tipo: &str,
+    contenido: &str,
+    origen: &str,
+    rev: i64,
+) -> Res<(String, String)> {
     c.execute(
         "INSERT INTO bloques (id, variante_seccion_id, posicion, tipo, rev) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![bid, vs_id, pos, tipo, rev],
     )?;
-    let vid = insertar_variante_bloque(c, &bid, contenido, origen, rev)?;
+    let vid = insertar_variante_bloque_con(c, vid, &bid, contenido, origen, rev)?;
     c.execute("UPDATE bloques SET variante_activa_id = ?2 WHERE id = ?1", params![bid, vid])?;
     Ok((bid, vid))
 }
 
 fn insertar_variante_bloque(c: &Connection, bloque_id: &str, contenido: &str, origen: &str, rev: i64) -> Res<String> {
-    let id = id_para(|d| &mut d.variante_bloque);
+    insertar_variante_bloque_con(c, id_para(|d| &mut d.variante_bloque), bloque_id, contenido, origen, rev)
+}
+
+fn insertar_variante_bloque_con(c: &Connection, id: String, bloque_id: &str, contenido: &str, origen: &str, rev: i64) -> Res<String> {
     let t = ahora();
     c.execute(
         "INSERT INTO variantes_bloque (id, bloque_id, contenido, origen, creado, cambiado, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)",
@@ -636,7 +686,8 @@ fn etiqueta(c: &Connection, nombre: &str, rev: i64) -> Res<String> {
         c.execute("UPDATE etiquetas SET borrado = 0, rev = ?2 WHERE id = ?1 AND borrado = 1", params![id, rev])?;
         return Ok(id);
     }
-    let id = nuevo_id();
+    // Fijo por nombre: el móvil crea la misma etiqueta sin conexión.
+    let id = id_de(&format!("etiqueta:{nombre}"));
     c.execute("INSERT INTO etiquetas (id, nombre, rev) VALUES (?1, ?2, ?3)", params![id, nombre, rev])?;
     Ok(id)
 }
@@ -717,7 +768,7 @@ pub fn crear_serie(c: &mut Connection, nombre: &str) -> Res<Serie> {
     }
     let tx = c.transaction()?;
     let rev = siguiente_rev(&tx)?;
-    let id = nuevo_id();
+    let id = id_para(|d| &mut d.serie);
     tx.execute("INSERT INTO series (id, nombre, rev) VALUES (?1, ?2, ?3)", params![id, nombre, rev])?;
     tx.commit()?;
     Ok(Serie { id, nombre: nombre.into() })
@@ -779,7 +830,7 @@ pub fn crear_idioma(c: &mut Connection, articulo_id: &str, idioma: &str, copiar_
                 .optional()?
                 .ok_or(Error::NoExiste("idioma de origen"))?;
             let _ = oid;
-            let iid = nuevo_id();
+            let iid = id_para(|d| &mut d.idioma);
             tx.execute(
                 "INSERT INTO idiomas (id, articulo_id, idioma, titulo, descripcion, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![iid, articulo_id, idioma, titulo, desc, rev],
@@ -857,16 +908,16 @@ pub fn borrar_idioma(c: &mut Connection, id: &str) -> Res<Articulo> {
 /// tal como se lee, sin arrastrar las pruebas de la rama de origen.
 fn copiar_rama(c: &Connection, origen: &str, idioma_id: &str, nombre: &str, rev: i64) -> Res<String> {
     let doc = documento(c, origen)?;
-    let rid = nuevo_id();
+    let rid = id_para(|d| &mut d.rama);
     c.execute(
         "INSERT INTO ramas (id, idioma_id, nombre, origen_id, creado, rev) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![rid, idioma_id, nombre, origen, ahora(), rev],
     )?;
     for s in &doc.secciones {
         let Some(vs) = s.variantes.iter().find(|v| Some(&v.id) == s.variante_activa_id.as_ref()) else { continue };
-        let sid = nuevo_id();
+        let sid = derivado(&s.id);
         c.execute("INSERT INTO secciones (id, rama_id, posicion, rev) VALUES (?1, ?2, ?3, ?4)", params![sid, rid, s.posicion, rev])?;
-        let vsid = insertar_variante_seccion(c, &sid, &vs.titulo, "tu", rev)?;
+        let vsid = insertar_variante_seccion_con(c, derivado(&vs.id), &sid, &vs.titulo, "tu", rev)?;
         c.execute("UPDATE secciones SET variante_activa_id = ?2 WHERE id = ?1", params![sid, vsid])?;
         copiar_bloques(c, vs, &vsid, rev)?;
     }
@@ -876,7 +927,7 @@ fn copiar_rama(c: &Connection, origen: &str, idioma_id: &str, nombre: &str, rev:
 fn copiar_bloques(c: &Connection, vs: &VarianteSeccion, destino: &str, rev: i64) -> Res<()> {
     for b in &vs.bloques {
         if let Some(vb) = b.variantes.iter().find(|v| Some(&v.id) == b.variante_activa_id.as_ref()) {
-            insertar_bloque(c, destino, &b.posicion, &b.tipo, &vb.contenido, "tu", rev)?;
+            insertar_bloque_con(c, derivado(&b.id), derivado(&vb.id), destino, &b.posicion, &b.tipo, &vb.contenido, "tu", rev)?;
         }
     }
     Ok(())

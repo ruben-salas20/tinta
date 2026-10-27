@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -104,11 +105,88 @@ class Repositorio(
         return op.id("bloque")
     }
 
+    /** Sección nueva detrás de [despuesDe] (o al final), con un párrafo vacío. Devuelve el id de ese párrafo. */
     suspend fun nuevaSeccion(ramaId: String, despuesDe: String?, titulo: String): String {
         val op = Op.crearSeccion(ramaId, titulo, despuesDe, null)
         hacer(op)
         return op.id("bloque")
     }
+
+    /** Falla en silencio si es la única sección de la rama, como en el servicio. */
+    suspend fun borrarSeccion(id: String) = hacer(Op.borrarSeccion(id))
+
+    suspend fun moverSeccion(id: String, antes: String?, despues: String?) =
+        hacer(Op.cambiarSeccion(id, buildJsonObject { put("mover", buildJsonObject { antes?.let { put("antes", it) }; despues?.let { put("despues", it) } }) }))
+
+    suspend fun moverBloque(id: String, antes: String?, despues: String?) =
+        hacer(Op.cambiarBloque(id, buildJsonObject { put("mover", buildJsonObject { antes?.let { put("antes", it) }; despues?.let { put("despues", it) } }) }))
+
+    suspend fun cambiarTipoBloque(id: String, tipo: String) = hacer(Op.cambiarBloque(id, buildJsonObject { put("tipo", tipo) }))
+
+    /** Otra variante de la sección, copiada de [desde] (o de la activa). Devuelve su id. */
+    suspend fun forkSeccion(seccionId: String, desde: String? = null, activar: Boolean = true): String {
+        val op = Op.forkSeccion(seccionId, desde, activar)
+        hacer(op)
+        return op.id("variante_seccion")
+    }
+
+    suspend fun borrarVarianteSeccion(id: String) = hacer(Op.borrarVarianteSeccion(id))
+
+    // --- Ramas e idiomas
+
+    /** Copia la rama con lo activo y devuelve el id de la nueva. */
+    suspend fun forkRama(ramaId: String, nombre: String): String {
+        val op = Op.forkRama(ramaId, nombre.trim().ifEmpty { "otra" })
+        hacer(op)
+        return op.id("rama")
+    }
+
+    suspend fun renombrarRama(id: String, nombre: String) = hacer(Op.renombrarRama(id, nombre))
+
+    /** La principal no se puede borrar: antes hay que elegir otra. */
+    suspend fun borrarRama(id: String) = hacer(Op.borrarRama(id))
+
+    suspend fun hacerPrincipal(idiomaId: String, ramaId: String) =
+        hacer(Op.cambiarIdioma(idiomaId, buildJsonObject { put("rama_principal_id", ramaId) }))
+
+    /** Añade la versión en [idioma]. Con [copiarDe], parte de la rama principal de ese idioma. Devuelve su id. */
+    suspend fun crearIdioma(articuloId: String, idioma: String, copiarDe: String?): String {
+        val op = Op.crearIdioma(articuloId, idioma, copiarDe)
+        hacer(op)
+        return op.id("idioma")
+    }
+
+    suspend fun borrarIdioma(id: String) = hacer(Op.borrarIdioma(id))
+
+    suspend fun cambiarDescripcion(idiomaId: String, descripcion: String) =
+        hacer(Op.cambiarIdioma(idiomaId, buildJsonObject { put("descripcion", descripcion) }))
+
+    suspend fun marcarTraducidoIa(idiomaId: String, si: Boolean) =
+        hacer(Op.cambiarIdioma(idiomaId, buildJsonObject { put("traducido_ia", si) }))
+
+    // --- Etiquetas y series
+
+    /** Sustituye todas las etiquetas del artículo. Las nuevas se crean solas. */
+    suspend fun cambiarEtiquetas(articuloId: String, nombres: List<String>) =
+        hacer(Op.cambiarArticulo(articuloId, buildJsonObject { put("etiquetas", JsonArray(nombres.map(::JsonPrimitive))) }))
+
+    /** [serieId] null quita el artículo de su serie. */
+    suspend fun cambiarSerie(articuloId: String, serieId: String?, parte: Long?) =
+        hacer(Op.cambiarArticulo(articuloId, buildJsonObject {
+            put("serie_id", serieId?.let(::JsonPrimitive) ?: JsonNull)
+            put("serie_parte", if (serieId == null) JsonNull else parte?.let(::JsonPrimitive) ?: JsonNull)
+        }))
+
+    /** Devuelve el id de la serie nueva. */
+    suspend fun crearSerie(nombre: String): String {
+        val op = Op.crearSerie(nombre.trim())
+        hacer(op)
+        return op.id("serie")
+    }
+
+    suspend fun renombrarSerie(id: String, nombre: String) = hacer(Op.renombrarSerie(id, nombre))
+
+    suspend fun borrarSerie(id: String) = hacer(Op.borrarSerie(id))
 
     suspend fun borrarBloque(id: String) = hacer(Op.borrarBloque(id))
 

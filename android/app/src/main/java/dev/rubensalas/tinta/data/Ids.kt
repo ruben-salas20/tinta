@@ -1,5 +1,6 @@
 package dev.rubensalas.tinta.data
 
+import java.security.MessageDigest
 import java.security.SecureRandom
 
 private val azar = SecureRandom()
@@ -10,6 +11,16 @@ fun nuevoId(): String {
     azar.nextBytes(b)
     return b.joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
+
+/** Como `modelo::id_de`: los 12 primeros bytes del SHA-256 de [texto], en hexadecimal. */
+fun idDe(texto: String): String =
+    MessageDigest.getInstance("SHA-256").digest(texto.toByteArray()).take(12).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
+/** Id de la copia de [original] en una copia con [semilla]: el mismo que calcula el servicio. */
+fun derivado(semilla: String, original: String) = idDe("$semilla:$original")
+
+/** Id de una etiqueta nueva: fijo por nombre, para crearla igual sin conexión. */
+fun idEtiqueta(nombre: String) = idDe("etiqueta:$nombre")
 
 /**
  * Posiciones fraccionarias, igual que `crates/tinta-server/src/posicion.rs`:

@@ -182,9 +182,17 @@ La app trabaja sin conexión: guarda una copia y una cola de cambios. La lógica
 | `crear_articulo` | `titulo, ids: {articulo, idioma, rama, seccion, variante_seccion, bloque, variante_bloque}` |
 | `cambiar_articulo` / `cambiar_idioma` | `id, cambio` (los mismos campos que el `PATCH`) |
 | `borrar_articulo` / `restaurar_articulo` | `id` |
+| `crear_idioma` | `articulo_id, idioma, copiar_de?, ids: {idioma, rama, semilla}`. Sin `copiar_de`, nace vacío y pide además `seccion, variante_seccion, bloque, variante_bloque` |
+| `borrar_idioma` | `id` |
+| `fork_rama` | `rama_id, nombre, ids: {rama, semilla}` |
+| `renombrar_rama` / `borrar_rama` | `id, nombre?` |
+| `crear_serie` | `nombre, ids: {serie}` |
+| `renombrar_serie` / `borrar_serie` | `id, nombre?` |
 | `crear_seccion` | `rama_id, titulo, antes?, despues?, ids: {seccion, variante_seccion, bloque, variante_bloque}` |
 | `cambiar_seccion` / `borrar_seccion` | `id, cambio?` |
 | `cambiar_variante_seccion` | `id, titulo` |
+| `fork_seccion` | `seccion_id, desde?, activar, ids: {variante_seccion, semilla}` |
+| `borrar_variante_seccion` | `id` |
 | `crear_bloque` | `variante_seccion_id, tipo, contenido, antes?, despues?, ids: {bloque, variante_bloque}` |
 | `cambiar_bloque` / `borrar_bloque` | `id, cambio?` |
 | `fork_bloque` | `bloque_id, contenido?, activar, ids: {variante_bloque}` |
@@ -194,6 +202,10 @@ La app trabaja sin conexión: guarda una copia y una cola de cambios. La lógica
 | `cambiar_publicacion` / `borrar_publicacion` | `id, cambio?` |
 
 **Reintentar es seguro.** Los ids los elige el móvil (24 caracteres hexadecimales en minúscula), así que una creación repetida responde `repetida: true` sin duplicar. Borrar lo que ya no existe no es un error. Guardar texto sobre una `rev_base` vieja crea una variante «conflicto» y no pisa nada. Lo demás gana el último en llegar.
+
+**Ids de las copias.** Copiar una rama, un idioma o una sección crea muchas piezas a la vez. Cada pieza copiada toma como id los 12 primeros bytes, en hexadecimal, del SHA-256 de `«semilla»:«id del original»`. Así el móvil crea la misma copia sin conexión. La copia lleva solo lo activo: la variante activa de cada sección y de cada bloque.
+
+**Ids de las etiquetas.** Una etiqueta nueva toma el SHA-256 de `etiqueta:«nombre»`, recortado igual. El nombre va sin espacios a los lados y en minúscula.
 
 **Qué hacer con cada resultado:** `ok: true`, quitarla de la cola. `ok: false` con `reintentar`, dejarla para la próxima vez. `ok: false` sin `reintentar`, son datos no válidos: descartarla y avisar.
 

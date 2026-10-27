@@ -47,6 +47,12 @@ interface DaoTinta {
     // --- Lecturas sueltas para aplicar cambios locales.
     @Query("SELECT * FROM articulos WHERE id = :id") suspend fun articulo(id: String): ArticuloE?
     @Query("SELECT * FROM idiomas WHERE id = :id") suspend fun idioma(id: String): IdiomaE?
+    @Query("SELECT * FROM idiomas WHERE articulo_id = :articulo AND borrado = 0") suspend fun idiomasDe(articulo: String): List<IdiomaE>
+    @Query("SELECT * FROM ramas WHERE id = :id") suspend fun rama(id: String): RamaE?
+    @Query("SELECT * FROM series WHERE id = :id") suspend fun serie(id: String): SerieE?
+    @Query("SELECT * FROM etiquetas WHERE nombre = :nombre") suspend fun etiquetaLlamada(nombre: String): EtiquetaE?
+    @Query("SELECT * FROM articulos WHERE serie_id = :serie AND borrado = 0") suspend fun articulosDeSerie(serie: String): List<ArticuloE>
+    @Query("SELECT * FROM variantes_seccion WHERE seccion_id = :seccion AND borrado = 0 ORDER BY creado") suspend fun variantesSeccionDe(seccion: String): List<VarianteSeccionE>
     @Query("SELECT * FROM secciones WHERE id = :id") suspend fun seccion(id: String): SeccionE?
     @Query("SELECT * FROM secciones WHERE rama_id = :rama AND borrado = 0 ORDER BY posicion") suspend fun seccionesDe(rama: String): List<SeccionE>
     @Query("SELECT * FROM variantes_seccion WHERE id = :id") suspend fun varianteSeccion(id: String): VarianteSeccionE?

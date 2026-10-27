@@ -141,6 +141,66 @@ class SincronizacionTest {
         OkHttpClient().newCall(del).execute().close()
     }
 
+    @Test fun copiasSinRedConLosMismosIds() = runBlocking {
+        sync.sincronizar()
+        val aid = repo.crearArticulo("Copias móvil ${nuevoId().take(6)}")
+        val es = dao.idiomasDe(aid).single()
+        val rama = es.ramaPrincipalId!!
+        val s1 = dao.seccionesDe(rama).single()
+        val b1 = dao.bloquesDe(s1.varianteActivaId!!).single()
+        repo.guardar(b1.varianteActivaId!!, "Primer párrafo")
+        repo.nuevaSeccion(rama, s1.id, "Segunda")
+
+        // Sin red: copiar la rama, crear la versión en inglés copiando, otra variante de sección,
+        // una serie y una etiqueta nueva.
+        val otra = repo.forkRama(rama, "prueba")
+        val en = repo.crearIdioma(aid, "en", "es")
+        val vs2 = repo.forkSeccion(s1.id)
+        val serie = repo.crearSerie("Serie ${nuevoId().take(6)}")
+        repo.cambiarSerie(aid, serie, 2)
+        val etiqueta = "móvil-${nuevoId().take(6)}"
+        repo.cambiarEtiquetas(aid, listOf(etiqueta.uppercase()))
+
+        val ramaEn = dao.idioma(en)!!.ramaPrincipalId!!
+        // Lo creado sin red, tabla por tabla, para comprobar que el servicio usó los mismos ids.
+        val locales = mutableListOf("ramas" to listOf(otra, ramaEn), "variantes_seccion" to listOf(vs2), "series" to listOf(serie))
+        for (vs in listOf(vs2)) locales += "bloques" to dao.bloquesDe(vs).map { it.id }
+        for (r in listOf(otra, ramaEn)) {
+            val ss = dao.seccionesDe(r)
+            assertEquals(2, ss.size)
+            val bs = ss.flatMap { dao.bloquesDe(it.varianteActivaId!!) }
+            locales += "secciones" to ss.map { it.id }
+            locales += "variantes_seccion" to ss.map { it.varianteActivaId!! }
+            locales += "bloques" to bs.map { it.id }
+            locales += "variantes_bloque" to bs.map { it.varianteActivaId!! }
+        }
+        val eid = dao.etiquetaLlamada(etiqueta)!!.id
+        assertEquals(listOf(eid), dao.articulo(aid)!!.etiquetas)
+        locales += "etiquetas" to listOf(eid)
+
+        val r = sync.sincronizar()
+        assertEquals(0, r.descartadas)
+        assertEquals(0, r.pendientes)
+
+        val todo = cliente.bajar(null).tablas
+        for ((tabla, lista) in locales) {
+            val enServicio = todo[tabla]!!.map { (it as JsonObject)["id"]!!.jsonPrimitive.content }.toSet()
+            assertTrue("$tabla: ${lista - enServicio} no existen en el servicio", enServicio.containsAll(lista))
+        }
+        assertEquals(serie, dao.articulo(aid)!!.serieId)
+        assertEquals(listOf(eid), dao.articulo(aid)!!.etiquetas)
+        val primerBloqueEn = dao.bloquesDe(dao.seccionesDe(ramaEn).first().varianteActivaId!!).first()
+        assertEquals("Primer párrafo", dao.varianteBloque(primerBloqueEn.varianteActivaId!!)!!.contenido)
+        val sinConfirmar = dao.ramas().first().count { it.rev < 0 } + dao.secciones().first().count { it.rev < 0 } +
+            dao.bloques().first().count { it.rev < 0 } + dao.variantesBloque().first().count { it.rev < 0 }
+        assertEquals("nada queda sin confirmar", 0, sinConfirmar)
+
+        val del = Request.Builder().url("$url/api/articulos/$aid").header("Authorization", "Bearer $clave").delete().build()
+        OkHttpClient().newCall(del).execute().close()
+        val delS = Request.Builder().url("$url/api/series/$serie").header("Authorization", "Bearer $clave").delete().build()
+        OkHttpClient().newCall(delS).execute().close()
+    }
+
     /** La fila [id] de [tabla] tal como está en el servicio, lápidas incluidas. */
     private suspend fun enServicio(tabla: String, id: String): JsonObject =
         cliente.bajar(null).tablas[tabla]!!.map { it as JsonObject }.single { it["id"]!!.jsonPrimitive.content == id }

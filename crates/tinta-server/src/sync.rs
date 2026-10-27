@@ -93,10 +93,20 @@ pub enum Op {
     CambiarIdioma { id: String, cambio: modelo::CambioIdioma },
     BorrarArticulo { id: String },
     RestaurarArticulo { id: String },
+    CrearIdioma { articulo_id: String, idioma: String, copiar_de: Option<String>, ids: IdsDados },
+    BorrarIdioma { id: String },
+    ForkRama { rama_id: String, nombre: String, ids: IdsDados },
+    RenombrarRama { id: String, nombre: String },
+    BorrarRama { id: String },
+    CrearSerie { nombre: String, ids: IdsDados },
+    RenombrarSerie { id: String, nombre: String },
+    BorrarSerie { id: String },
     CrearSeccion { rama_id: String, #[serde(default)] titulo: String, antes: Option<String>, despues: Option<String>, ids: IdsDados },
     CambiarSeccion { id: String, cambio: modelo::CambioSeccion },
     BorrarSeccion { id: String },
     CambiarVarianteSeccion { id: String, titulo: String },
+    ForkSeccion { seccion_id: String, desde: Option<String>, #[serde(default)] activar: bool, ids: IdsDados },
+    BorrarVarianteSeccion { id: String },
     CrearBloque {
         variante_seccion_id: String,
         #[serde(default = "parrafo")]
@@ -155,6 +165,37 @@ pub fn aplicar(c: &mut Connection, op: Op, dispositivo: &str) -> Res<Value> {
         BorrarArticulo { id } => borrado_ok(modelo::borrar_articulo(c, &id)),
         // Restaurar lo que ya está vivo tampoco es un error.
         RestaurarArticulo { id } => borrado_ok(modelo::restaurar_articulo(c, &id)),
+        CrearIdioma { articulo_id, idioma, copiar_de, ids } => {
+            if ya_creado(c, "idiomas", &ids.idioma)? {
+                return Ok(json!({ "repetida": true }));
+            }
+            modelo::con_ids(ids, || modelo::crear_idioma(c, &articulo_id, &idioma, copiar_de.as_deref())).map(|_| json!({}))
+        }
+        BorrarIdioma { id } => borrado_ok(modelo::borrar_idioma(c, &id)),
+        ForkRama { rama_id, nombre, ids } => {
+            if ya_creado(c, "ramas", &ids.rama)? {
+                return Ok(json!({ "repetida": true }));
+            }
+            modelo::con_ids(ids, || modelo::fork_rama(c, &rama_id, &nombre)).map(|_| json!({}))
+        }
+        RenombrarRama { id, nombre } => modelo::renombrar_rama(c, &id, &nombre).map(|_| json!({})),
+        BorrarRama { id } => borrado_ok(modelo::borrar_rama(c, &id)),
+        CrearSerie { nombre, ids } => {
+            if ya_creado(c, "series", &ids.serie)? {
+                return Ok(json!({ "repetida": true }));
+            }
+            modelo::con_ids(ids, || modelo::crear_serie(c, &nombre)).map(|_| json!({}))
+        }
+        RenombrarSerie { id, nombre } => modelo::renombrar_serie(c, &id, &nombre).map(|_| json!({})),
+        BorrarSerie { id } => borrado_ok(modelo::borrar_serie(c, &id)),
+        ForkSeccion { seccion_id, desde, activar, ids } => {
+            if ya_creado(c, "variantes_seccion", &ids.variante_seccion)? {
+                return Ok(json!({ "repetida": true }));
+            }
+            let f = modelo::ForkSeccion { desde, activar, origen: "tu".into() };
+            modelo::con_ids(ids, || modelo::fork_seccion(c, &seccion_id, f)).map(|_| json!({}))
+        }
+        BorrarVarianteSeccion { id } => borrado_ok(modelo::borrar_variante_seccion(c, &id)),
         CrearSeccion { rama_id, titulo, antes, despues, ids } => {
             if ya_creado(c, "secciones", &ids.seccion)? {
                 return Ok(json!({ "repetida": true }));
@@ -301,5 +342,43 @@ mod pruebas {
         modelo::borrar_articulo(&mut c, &a.id).unwrap();
         let tras = bajar(&c, nuevo["rev"].as_i64().unwrap()).unwrap();
         assert_eq!(tras["tablas"]["articulos"][0]["borrado"], 1);
+    }
+
+    #[test]
+    fn copias_con_ids_derivados() {
+        assert_eq!(modelo::id_de(&format!("{}:{}", "a".repeat(24), "b".repeat(24))), "db1a5ddbd892f21e46beccd1");
+        let mut c = en_memoria();
+        let a = modelo::crear_articulo(&mut c, "Copiar").unwrap();
+        let es = &a.idiomas[0];
+        let rama = es.resumen.rama_principal_id.clone().unwrap();
+        let doc = modelo::documento(&c, &rama).unwrap();
+        let s0 = &doc.secciones[0];
+        let semilla = id(50);
+        let cola = vec![
+            json!({ "op": "fork_rama", "rama_id": rama, "nombre": "otra", "ids": { "rama": id(51), "semilla": semilla } }),
+            json!({ "op": "fork_rama", "rama_id": rama, "nombre": "otra", "ids": { "rama": id(51), "semilla": semilla } }),
+            json!({ "op": "crear_idioma", "articulo_id": a.id, "idioma": "en", "copiar_de": "es", "ids": { "idioma": id(52), "rama": id(53), "semilla": id(54) } }),
+            json!({ "op": "fork_seccion", "seccion_id": s0.id, "activar": true, "ids": { "variante_seccion": id(55), "semilla": id(56) } }),
+            json!({ "op": "crear_serie", "nombre": "Serie", "ids": { "serie": id(57) } }),
+            json!({ "op": "cambiar_articulo", "id": a.id, "cambio": { "serie_id": id(57), "etiquetas": ["IA"] } }),
+        ];
+        let r = subir(&mut c, cola, "android");
+        let rs = r["resultados"].as_array().unwrap();
+        assert!(rs.iter().all(|x| x["ok"] == true), "{rs:?}");
+        assert_eq!(rs[1]["repetida"], true);
+        let copia = modelo::documento(&c, &id(51)).unwrap();
+        assert_eq!(copia.secciones[0].id, modelo::id_de(&format!("{semilla}:{}", s0.id)));
+        let b0 = &s0.variantes[0].bloques[0];
+        let cb = &copia.secciones[0].variantes[0].bloques[0];
+        assert_eq!(cb.id, modelo::id_de(&format!("{semilla}:{}", b0.id)));
+        assert_eq!(cb.variantes[0].id, modelo::id_de(&format!("{semilla}:{}", b0.variantes[0].id)));
+        let en = modelo::documento(&c, &id(53)).unwrap();
+        assert_eq!(en.secciones[0].id, modelo::id_de(&format!("{}:{}", id(54), s0.id)));
+        let tras = modelo::documento(&c, &rama).unwrap();
+        assert_eq!(tras.secciones[0].variante_activa_id.as_deref(), Some(id(55).as_str()));
+        let art = modelo::articulo(&c, &a.id).unwrap();
+        assert_eq!(art.serie.map(|s| s.id).as_deref(), Some(id(57).as_str()));
+        let eid: String = c.query_row("SELECT id FROM etiquetas WHERE nombre = 'ia'", [], |r| r.get(0)).unwrap();
+        assert_eq!(eid, "44000961e19ffa8806626024");
     }
 }

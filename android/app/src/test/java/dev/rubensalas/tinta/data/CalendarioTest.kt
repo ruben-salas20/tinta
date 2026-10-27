@@ -1,6 +1,8 @@
 package dev.rubensalas.tinta.data
 
+import dev.rubensalas.tinta.data.calendario.horaEntera
 import dev.rubensalas.tinta.data.calendario.partir
+import dev.rubensalas.tinta.data.calendario.rangoHoras
 import dev.rubensalas.tinta.data.local.PublicacionE
 import dev.rubensalas.tinta.data.resumen.Avisos
 import dev.rubensalas.tinta.data.resumen.Resumen
@@ -41,6 +43,17 @@ class CalendarioTest {
         assertEquals("Hoy: 3 publicaciones y 1 atrasada", r.titulo)
         assertEquals("09:00 · X · pronto", r.lineas { "X" }.first())
         assertEquals("Hoy no toca publicar nada", Resumen.calcular(emptyList(), hoy).titulo)
+    }
+
+    @Test fun rejillaDeHoras() {
+        assertEquals(null, horaEntera(null))
+        assertEquals(18, horaEntera("18:30"))
+        assertEquals(9..16, rangoHoras(emptyList()))
+        assertEquals(10..17, rangoHoras(listOf(10, 12)))
+        assertEquals(9..16, rangoHoras(listOf(9, 12)))
+        assertEquals(9..18, rangoHoras(listOf(9, 18)))
+        assertEquals(0..7, rangoHoras(listOf(0)))
+        assertEquals(16..23, rangoHoras(listOf(23)))
     }
 
     @Test fun proximoAviso() {

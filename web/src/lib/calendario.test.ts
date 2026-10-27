@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contar, fechaCorta, lunes, nombreMes, nombreSemana, partir, semanaDe, semanasDelMes, sumarDias, sumarMeses } from './calendario';
+import { contar, enHora, fechaCorta, horaEntera, lunes, nombreMes, nombreSemana, partir, rangoHoras, semanaDe, semanasDelMes, sumarDias, sumarMeses } from './calendario';
 
 describe('fechas', () => {
   it('lunes de la semana', () => {
@@ -56,5 +56,31 @@ describe('partir', () => {
   it('sin espacios, corta en el límite; cuenta emojis como uno', () => {
     expect(partir('abcdefghij', 4)).toEqual(['abcd', 'efghij']);
     expect(contar('🧵 hilo')).toBe(6);
+  });
+});
+
+describe('horas de la semana', () => {
+  it('la rejilla va de la primera a la última hora con publicación, con mínimo de 8', () => {
+    expect(rangoHoras([])).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(rangoHoras([10, 12])).toEqual([10, 11, 12, 13, 14, 15, 16, 17]);
+    expect(rangoHoras([9, 12])).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(rangoHoras([9, 18])).toEqual([9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  });
+
+  it('el mínimo no se sale de 0 a 23', () => {
+    expect(rangoHoras([0])).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(rangoHoras([23])).toEqual([16, 17, 18, 19, 20, 21, 22, 23]);
+  });
+
+  it('la hora entera sale de «HH:MM» y null si no hay hora', () => {
+    expect(horaEntera('18:30')).toBe(18);
+    expect(horaEntera(null)).toBeNull();
+  });
+
+  it('enHora separa las publicaciones por hora y la franja sin hora', () => {
+    const ps = [{ id: 'a', hora: '09:00' }, { id: 'b', hora: '09:45' }, { id: 'c', hora: null }, { id: 'd', hora: '18:00' }];
+    expect(enHora(ps, 9).map((p) => p.id)).toEqual(['a', 'b']);
+    expect(enHora(ps, null).map((p) => p.id)).toEqual(['c']);
+    expect(enHora(ps, 12)).toEqual([]);
   });
 });

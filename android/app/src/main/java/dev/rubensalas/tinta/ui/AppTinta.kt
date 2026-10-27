@@ -284,7 +284,12 @@ fun AppTinta(c: Contenedor) {
                     PantallaPublicacion(datos, id, accionesPublicacion(c, id, scope, ::copiar, ::elegirImagen, nav), imagen, onVolver = { nav.popBackStack() })
                 }
             }
-            SnackbarHost(avisoAbajo, Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 8.dp)) { AvisoDeshacer(it) }
+            // Encima del botón «+» (56 dp más su margen de 18), para no taparlo.
+            val conBoton = seccion != null && seccion != Seccion.Ajustes
+            SnackbarHost(
+                avisoAbajo,
+                Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = if (conBoton) 82.dp else 8.dp),
+            ) { AvisoDeshacer(it) }
         }
         if (seccion != null) BarraInferior(seccion) { s ->
             nav.navigate(s.name) { popUpTo(Seccion.Hoy.name); launchSingleTop = true }

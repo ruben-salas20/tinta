@@ -261,7 +261,7 @@ pub fn subir(c: &mut Connection, ops: Vec<Value>, dispositivo: &str) -> Value {
                     r
                 }
                 Err(Error::NoExiste(q)) => json!({ "ok": false, "error": format!("no existe: {q}") }),
-                Err(Error::Invalido(m)) => json!({ "ok": false, "error": m }),
+                Err(Error::Invalido(m) | Error::Incoherente(m)) => json!({ "ok": false, "error": m }),
                 Err(Error::Db(e)) => {
                     tracing::error!("sync, base de datos: {e}");
                     json!({ "ok": false, "error": "error de base de datos", "reintentar": true })
@@ -305,6 +305,23 @@ mod pruebas {
         assert_eq!(modelo::listar_articulos(&c).unwrap().len(), 1);
         assert_eq!(modelo::documento(&c, &id(3)).unwrap().secciones[0].variantes[0].bloques.len(), 2);
         assert_eq!(calendario::publicacion(&c, &id(10)).unwrap().hora.as_deref(), Some("09:00"));
+    }
+
+    #[test]
+    fn publicacion_con_nulos_por_sync() {
+        let mut c = en_memoria();
+        let r = subir(
+            &mut c,
+            vec![
+                json!({ "op": "crear_publicacion", "publicacion": { "titulo": "Idea", "partes": [{ "texto": "a" }] }, "ids": { "publicacion": id(20) } }),
+                json!({ "op": "cambiar_publicacion", "id": id(20), "cambio": { "canal_id": "x", "formato": "post", "fecha": "2026-11-01", "hora": "09:00" } }),
+                json!({ "op": "cambiar_publicacion", "id": id(20), "cambio": { "fecha": null, "canal_id": null, "formato": null } }),
+            ],
+            "android",
+        );
+        assert!(r["resultados"].as_array().unwrap().iter().all(|x| x["ok"] == true), "{r}");
+        let p = calendario::publicacion(&c, &id(20)).unwrap();
+        assert_eq!((p.fecha.is_none(), p.canal_id.is_none(), p.formato.is_none(), p.hora.is_none()), (true, true, true, true));
     }
 
     #[test]

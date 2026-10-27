@@ -131,7 +131,7 @@ fn herramientas() -> Value {
         },
         {
             "name": "leer_calendario",
-            "description": "Lee los canales y las publicaciones entre dos fechas (por defecto, de hoy a 30 días).",
+            "description": "Lee los canales, las publicaciones entre dos fechas (por defecto, de hoy a 30 días) y las ideas sin fecha.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "desde": id("AAAA-MM-DD"), "hasta": id("AAAA-MM-DD") }
@@ -140,36 +140,36 @@ fn herramientas() -> Value {
         },
         {
             "name": "crear_publicacion",
-            "description": "Crea una publicación en el calendario. Un hilo de X admite varias partes; el resto, una. Por defecto nace en estado idea.",
+            "description": "Crea una publicación en el calendario. Canal, formato y fecha son opcionales: sin fecha, es una idea suelta. Un hilo de X admite varias partes; el resto, una. Por defecto nace en estado idea.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "canal_id": id("x, linkedin, instagram, portfolio…: los de leer_calendario."),
-                    "formato": id("Un formato de ese canal: post, hilo, articulo…"),
-                    "fecha": id("AAAA-MM-DD"),
-                    "hora": id("HH:MM (opcional)"),
+                    "canal_id": id("x, linkedin, instagram, portfolio…: los de leer_calendario. Opcional."),
+                    "formato": id("Un formato de ese canal: post, hilo, articulo… Opcional; solo con canal."),
+                    "fecha": id("AAAA-MM-DD. Opcional."),
+                    "hora": id("HH:MM (opcional; solo con fecha)"),
                     "estado": { "type": "string", "enum": calendario::ESTADOS, "description": "Por defecto, idea." },
                     "titulo": id("Para reconocerla en el calendario."),
                     "partes": { "type": "array", "items": { "type": "string" }, "description": "El texto de cada parte." },
                     "articulo_id": id("Artículo del que sale (opcional).")
                 },
-                "required": ["canal_id", "formato", "fecha", "partes"]
+                "required": ["partes"]
             }
         },
         {
             "name": "cambiar_publicacion",
-            "description": "Cambia una publicación: moverla de fecha u hora, cambiar su estado, texto, título, canal, formato o artículo. Solo cambia los campos que pases. Mover la del portfolio cambia también la fecha del artículo.",
+            "description": "Cambia una publicación: moverla de fecha u hora, cambiar su estado, texto, título, canal, formato o artículo. Solo cambia los campos que pases. Cadena vacía quita la fecha (y la hora), el canal (y el formato) o el artículo. Mover la del portfolio cambia también la fecha del artículo.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "publicacion_id": id("Id de la publicación (de leer_calendario)."),
-                    "fecha": id("AAAA-MM-DD"),
+                    "fecha": id("AAAA-MM-DD, o cadena vacía para quitar la fecha (queda como idea)."),
                     "hora": id("HH:MM, o cadena vacía para quitar la hora."),
                     "estado": { "type": "string", "enum": calendario::ESTADOS },
                     "titulo": { "type": "string" },
                     "partes": { "type": "array", "items": { "type": "string" }, "description": "Sustituye el texto de todas las partes." },
-                    "canal_id": { "type": "string" },
-                    "formato": { "type": "string" },
+                    "canal_id": id("Id del canal, o cadena vacía para quitarlo (y con él el formato)."),
+                    "formato": id("Formato del canal, o cadena vacía para quitarlo."),
                     "articulo_id": id("Id del artículo, o cadena vacía para desligarla.")
                 },
                 "required": ["publicacion_id"]
@@ -248,7 +248,7 @@ fn fallo_markdown(f: critic::Fallo) -> String {
 fn texto_error(e: Error) -> String {
     match e {
         Error::NoExiste(q) => format!("No existe: {q}."),
-        Error::Invalido(m) => m,
+        Error::Invalido(m) | Error::Incoherente(m) => m,
         Error::Db(e) => {
             tracing::error!("mcp, base de datos: {e}");
             "Error de base de datos.".into()
@@ -365,9 +365,9 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
         "crear_publicacion" => {
             #[derive(Deserialize)]
             struct A {
-                canal_id: String,
-                formato: String,
-                fecha: String,
+                canal_id: Option<String>,
+                formato: Option<String>,
+                fecha: Option<String>,
                 hora: Option<String>,
                 estado: Option<String>,
                 #[serde(default)]
@@ -376,13 +376,15 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
                 articulo_id: Option<String>,
             }
             let a: A = args(a)?;
+            // Cadena vacía = sin valor, como en cambiar_publicacion.
+            let vacio = |v: Option<String>| v.filter(|x| !x.is_empty());
             calendario::crear_publicacion(
                 c,
                 calendario::NuevaPublicacion {
-                    canal_id: a.canal_id,
-                    formato: a.formato,
-                    fecha: a.fecha,
-                    hora: a.hora.filter(|h| !h.is_empty()),
+                    canal_id: vacio(a.canal_id),
+                    formato: vacio(a.formato),
+                    fecha: vacio(a.fecha),
+                    hora: vacio(a.hora),
                     estado: a.estado.unwrap_or_else(|| "idea".into()),
                     titulo: a.titulo,
                     partes: Some(partes(a.partes)),
@@ -390,7 +392,7 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
                     origen,
                 },
             )
-            .map(|p| format!("Publicación creada el {} en estado {} [{}].", p.fecha, p.estado, p.id))
+            .map(|p| format!("Publicación creada el {} en estado {} [{}].", p.fecha.as_deref().unwrap_or("sin fecha"), p.estado, p.id))
             .map_err(texto_error)
         }
         "cambiar_publicacion" => {
@@ -410,9 +412,9 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
             // Cadena vacía = quitar: un agente no siempre sabe mandar null.
             let vaciable = |v: Option<String>| v.map(|x| Some(x).filter(|x| !x.is_empty()));
             let cambio = calendario::CambioPublicacion {
-                canal_id: a.canal_id,
-                formato: a.formato,
-                fecha: a.fecha,
+                canal_id: vaciable(a.canal_id),
+                formato: vaciable(a.formato),
+                fecha: vaciable(a.fecha),
                 hora: vaciable(a.hora),
                 estado: a.estado,
                 titulo: a.titulo,
@@ -434,7 +436,7 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
                 enlace: None,
             };
             calendario::actualizar_publicacion_como(c, &a.publicacion_id, cambio, &origen)
-                .map(|p| format!("Publicación cambiada: {}{} · {} [{}].", p.fecha, p.hora.map(|h| format!(" {h}")).unwrap_or_default(), p.estado, p.id))
+                .map(|p| format!("Publicación cambiada: {}{} · {} [{}].", p.fecha.as_deref().unwrap_or("sin fecha"), p.hora.map(|h| format!(" {h}")).unwrap_or_default(), p.estado, p.id))
                 .map_err(texto_error)
         }
         "borrar_publicacion" => {
@@ -545,14 +547,34 @@ fn calendario_texto(c: &Connection, desde: Option<String>, hasta: Option<String>
     if ps.is_empty() {
         s.push_str("(ninguna)\n");
     }
-    for p in ps {
-        let _ = write!(s, "- {}{} · {} {} · {} · «{}» [{}]", p.fecha, p.hora.map(|h| format!(" {h}")).unwrap_or_default(), p.canal_id, p.formato, p.estado, p.titulo, p.id);
-        if let Some(a) = p.articulo {
-            let _ = write!(s, " · del artículo [{}]", a.id);
-        }
-        let _ = writeln!(s, " · {} partes", p.partes.len());
+    for p in &ps {
+        linea_publicacion(&mut s, p);
+    }
+    let ideas = calendario::listar_publicaciones(c, &calendario::Filtro { sin_fecha: Some(true), ..Default::default() })?;
+    let _ = writeln!(s, "\nIdeas sin fecha:");
+    if ideas.is_empty() {
+        s.push_str("(ninguna)\n");
+    }
+    for p in &ideas {
+        linea_publicacion(&mut s, p);
     }
     Ok(s)
+}
+
+fn linea_publicacion(s: &mut String, p: &calendario::Publicacion) {
+    let cuando = match &p.fecha {
+        Some(f) => format!("{f}{}", p.hora.as_ref().map(|h| format!(" {h}")).unwrap_or_default()),
+        None => "sin fecha".into(),
+    };
+    let canal = match &p.canal_id {
+        Some(k) => format!("{k} {}", p.formato.as_deref().unwrap_or("")),
+        None => "sin canal".into(),
+    };
+    let _ = write!(s, "- {cuando} · {canal} · {} · «{}» [{}]", p.estado, p.titulo, p.id);
+    if let Some(a) = &p.articulo {
+        let _ = write!(s, " · del artículo [{}]", a.id);
+    }
+    let _ = writeln!(s, " · {} partes", p.partes.len());
 }
 
 #[cfg(test)]
@@ -633,7 +655,7 @@ mod pruebas {
         let pid = ps[0].id.clone();
         llamar_ok(&mut c, "cambiar_publicacion", json!({ "publicacion_id": pid, "fecha": "2026-11-05", "hora": "18:00", "estado": "programada" }));
         let p = calendario::publicacion(&c, &pid).unwrap();
-        assert_eq!((p.fecha.as_str(), p.hora.as_deref(), p.estado.as_str(), p.origen.as_str()), ("2026-11-05", Some("18:00"), "programada", "ia:claude"));
+        assert_eq!((p.fecha.as_deref(), p.hora.as_deref(), p.estado.as_str(), p.origen.as_str()), (Some("2026-11-05"), Some("18:00"), "programada", "ia:claude"));
         llamar_ok(&mut c, "cambiar_publicacion", json!({ "publicacion_id": pid, "hora": "" }));
         assert!(calendario::publicacion(&c, &pid).unwrap().hora.is_none());
         // La del portfolio arrastra la fecha del artículo también desde el MCP.
@@ -641,5 +663,12 @@ mod pruebas {
         assert_eq!(modelo::articulo(&c, &a.id).unwrap().fecha.as_deref(), Some("2026-11-10"));
         llamar_ok(&mut c, "borrar_publicacion", json!({ "publicacion_id": pid }));
         assert!(calendario::publicacion(&c, &pid).is_err());
+        // Una idea sin canal ni fecha nace suelta y sale en leer_calendario.
+        llamar_ok(&mut c, "crear_publicacion", json!({ "partes": ["Idea suelta"], "titulo": "Suelta" }));
+        let ideas = calendario::listar_publicaciones(&c, &calendario::Filtro { sin_fecha: Some(true), ..Default::default() }).unwrap();
+        assert_eq!(ideas.len(), 1);
+        assert!(ideas[0].canal_id.is_none() && ideas[0].fecha.is_none());
+        let cal = llamar_ok(&mut c, "leer_calendario", json!({}));
+        assert!(cal.contains("Ideas sin fecha:") && cal.contains("sin canal") && cal.contains("«Suelta»"), "{cal}");
     }
 }

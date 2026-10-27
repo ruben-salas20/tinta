@@ -189,6 +189,30 @@ CREATE TABLE autoria_ia (
   creado TEXT NOT NULL
 );
 CREATE INDEX autoria_ia_variante ON autoria_ia(variante_bloque_id);
+"#, r#"
+-- Ideas sin fecha ni canal: fecha, canal_id y formato admiten nulo.
+-- SQLite no quita un NOT NULL con ALTER, así que se rehace la tabla. Ninguna
+-- otra tabla la referencia, así que borrarla no rompe claves externas.
+CREATE TABLE publicaciones_nueva (
+  id TEXT PRIMARY KEY,
+  canal_id TEXT REFERENCES canales(id),
+  formato TEXT,
+  fecha TEXT,
+  hora TEXT,
+  estado TEXT NOT NULL DEFAULT 'idea',
+  titulo TEXT NOT NULL DEFAULT '',
+  partes TEXT NOT NULL DEFAULT '[{"texto":"","medios":[]}]',
+  articulo_id TEXT REFERENCES articulos(id),
+  enlace TEXT,
+  origen TEXT NOT NULL DEFAULT 'tu',
+  creado TEXT NOT NULL, cambiado TEXT NOT NULL,
+  rev INTEGER NOT NULL, borrado INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO publicaciones_nueva (id, canal_id, formato, fecha, hora, estado, titulo, partes, articulo_id, enlace, origen, creado, cambiado, rev, borrado)
+  SELECT id, canal_id, formato, fecha, hora, estado, titulo, partes, articulo_id, enlace, origen, creado, cambiado, rev, borrado FROM publicaciones;
+DROP TABLE publicaciones;
+ALTER TABLE publicaciones_nueva RENAME TO publicaciones;
+CREATE INDEX publicaciones_fecha ON publicaciones(fecha) WHERE borrado = 0;
 "#];
 
 pub fn abrir(ruta: &Path) -> rusqlite::Result<Connection> {
@@ -241,5 +265,40 @@ mod pruebas {
         assert_eq!(super::siguiente_rev(&c).unwrap(), 1);
         assert_eq!(super::siguiente_rev(&c).unwrap(), 2);
         assert_eq!(super::rev_actual(&c).unwrap(), 2);
+    }
+
+    #[test]
+    fn migra_publicaciones_sin_perder_datos() {
+        let c = rusqlite::Connection::open_in_memory().unwrap();
+        c.pragma_update(None, "foreign_keys", true).unwrap();
+        let anteriores = super::MIGRACIONES.len() - 1;
+        for sql in &super::MIGRACIONES[..anteriores] {
+            c.execute_batch(sql).unwrap();
+        }
+        c.pragma_update(None, "user_version", anteriores as i64).unwrap();
+        c.execute_batch(
+            r#"INSERT INTO publicaciones (id, canal_id, formato, fecha, hora, estado, titulo, partes, creado, cambiado, rev) VALUES
+               ('p1', 'x', 'post', '2026-11-01', '18:00', 'programada', 'Uno', '[{"texto":"hola","medios":[]}]', 't', 't', 5),
+               ('p2', 'portfolio', 'articulo', '2026-11-02', NULL, 'idea', '', '[{"texto":"","medios":[]}]', 't', 't', 6);"#,
+        )
+        .unwrap();
+
+        let c = super::preparar(c).unwrap();
+        let fila: (String, Option<String>, String, String, Option<String>, i64) = c
+            .query_row(
+                "SELECT canal_id, hora, formato, fecha, titulo, rev FROM publicaciones WHERE id = 'p1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            )
+            .unwrap();
+        assert_eq!((fila.0.as_str(), fila.1.as_deref(), fila.2.as_str(), fila.3.as_str(), fila.4.as_deref(), fila.5), ("x", Some("18:00"), "post", "2026-11-01", Some("Uno"), 5));
+        let total: i64 = c.query_row("SELECT count(*) FROM publicaciones", [], |r| r.get(0)).unwrap();
+        assert_eq!(total, 2);
+        // Ahora cabe una idea sin fecha ni canal, y el índice por fecha sigue ahí.
+        c.execute("INSERT INTO publicaciones (id, creado, cambiado, rev) VALUES ('p3', 't', 't', 7)", []).unwrap();
+        let indices: i64 = c.query_row("SELECT count(*) FROM sqlite_master WHERE name = 'publicaciones_fecha'", [], |r| r.get(0)).unwrap();
+        assert_eq!(indices, 1);
+        let version: i64 = c.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+        assert_eq!(version, super::MIGRACIONES.len() as i64);
     }
 }

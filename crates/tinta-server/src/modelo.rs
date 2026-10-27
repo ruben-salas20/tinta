@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 pub enum Error {
     NoExiste(&'static str),
     Invalido(String),
+    /// Datos bien escritos que se contradicen entre sí (422).
+    Incoherente(String),
     Db(rusqlite::Error),
 }
 
@@ -2002,7 +2004,7 @@ mod pruebas {
         let mut c = en_memoria();
         let (a, _) = nuevo(&mut c);
         let nueva = |fecha: &str, estado: &str| crate::calendario::NuevaPublicacion {
-            canal_id: "x".into(), formato: "post".into(), fecha: fecha.into(), hora: None, estado: estado.into(),
+            canal_id: Some("x".into()), formato: Some("post".into()), fecha: Some(fecha.into()), hora: None, estado: estado.into(),
             titulo: String::new(), partes: None, articulo_id: Some(a.id.clone()), origen: "tu".into(),
         };
         let idea = crate::calendario::crear_publicacion(&mut c, nueva("2026-11-01", "idea")).unwrap();

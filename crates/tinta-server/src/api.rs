@@ -45,6 +45,7 @@ impl From<Error> for ErrorApi {
         match e {
             Error::NoExiste(que) => ErrorApi(StatusCode::NOT_FOUND, format!("no existe: {que}")),
             Error::Invalido(m) => ErrorApi(StatusCode::BAD_REQUEST, m),
+            Error::Incoherente(m) => ErrorApi(StatusCode::UNPROCESSABLE_ENTITY, m),
             Error::Db(e) => {
                 tracing::error!("base de datos: {e}");
                 ErrorApi(StatusCode::INTERNAL_SERVER_ERROR, "error de base de datos".into())

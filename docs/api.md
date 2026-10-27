@@ -18,6 +18,7 @@ La API la usan la web, la app de Android y, desde la fase 3, el MCP. Todo va en 
 | Código | Cuándo | Cuerpo |
 |---|---|---|
 | 400 | Dato no válido: estado desconocido, fecha mal escrita, borrar lo último que queda | `{"error": "…"}` en español, listo para mostrar |
+| 422 | Datos que se contradicen: `programada` sin fecha, formato sin canal, hora sin fecha | `{"error": "…"}` con el motivo |
 | 401 | Sin acceso | `{"error": "hace falta entrar"}` |
 | 404 | No existe, o está borrado | `{"error": "no existe: …"}` |
 
@@ -139,18 +140,20 @@ Las fechas van en `AAAA-MM-DD` y las horas en `HH:MM`, en la hora local de Rubé
 | `GET /api/canales` | | `[Canal]`, en orden. Cada uno trae `formatos: [{id, nombre, limite, partes}]` y `activo` |
 | `POST /api/canales` | `{nombre, icono, formatos}` | 201 y el canal |
 | `PATCH /api/canales/{id}` | `{nombre?, activo?, formatos?}` | El canal |
-| `GET /api/publicaciones?desde&hasta&canal&articulo` | | `[Publicacion]`, por fecha y hora. Los cuatro filtros son opcionales; las fechas, incluidas |
-| `POST /api/publicaciones` | `{canal_id, formato, fecha, hora?, estado = "idea", titulo?, partes?, articulo_id?}` | 201 y la publicación |
+| `GET /api/publicaciones?desde&hasta&canal&articulo&sin_fecha` | | `[Publicacion]`, por fecha y hora. Los filtros son opcionales; las fechas, incluidas. `sin_fecha=true` devuelve solo las ideas sin fecha, de la más reciente a la más antigua por `cambiado`. Con `desde` o `hasta`, las que no tienen fecha no salen |
+| `POST /api/publicaciones` | `{canal_id?, formato?, fecha?, hora?, estado = "idea", titulo?, partes?, articulo_id?}` | 201 y la publicación |
 | `GET /api/publicaciones/{id}` | | `Publicacion` |
-| `PATCH /api/publicaciones/{id}` | Cualquier campo de los de crear, más `enlace`. `null` vacía `hora`, `articulo_id` o `enlace` | `Publicacion` |
+| `PATCH /api/publicaciones/{id}` | Cualquier campo de los de crear, más `enlace`. `null` vacía `fecha` (y con ella `hora`), `canal_id` (y con él `formato`), `hora`, `articulo_id` o `enlace` | `Publicacion` |
 | `DELETE /api/publicaciones/{id}` | | 204 |
 | `POST /api/articulos/{id}/difusion` | `[{canal_id, formato, fecha, hora?}]` | 201 y las publicaciones nuevas, en estado `idea` con el título del artículo. Salvo en el portfolio, su texto empieza con la descripción |
 
 - **Estados:** `idea`, `preparando`, `programada` y `publicada`.
+- **Ideas sin fecha ni canal:** una publicación puede no tener `fecha` ni `canal_id`. Sin fecha, solo puede estar en `idea` o `preparando`. Sin canal, no tiene `formato` y admite cuantas partes quiera.
+- **Reglas de coherencia:** `formato` es nulo si y solo si `canal_id` es nulo. `hora` solo existe con `fecha`. `programada` y `publicada` exigen fecha y canal. Si no se cumple, 422.
 - **Partes:** `[{texto, medios: [id]}]`. Un formato con `partes: false` admite una sola; un hilo de X, varias. `limite` son los caracteres por parte; la web cuenta, el servicio no corta.
 - **Canales de serie:** `x`, `linkedin`, `instagram` y `portfolio`, activos; `youtube` y `tiktok`, inactivos hasta que se activen.
-- **El portfolio manda en la fecha del artículo.** Crear o mover una publicación del canal `portfolio` que sale de un artículo cambia su `fecha`, que es la `date` del `.md` exportado.
-- `Articulo` trae `proxima: {canal_id, fecha, hora} | null`: la siguiente publicación sin publicar desde hoy.
+- **El portfolio manda en la fecha del artículo.** Crear o mover una publicación del canal `portfolio` que sale de un artículo cambia su `fecha`, que es la `date` del `.md` exportado. Una sin fecha no cambia nada.
+- `Articulo` trae `proxima: {canal_id, fecha, hora} | null`: la siguiente publicación con canal, sin publicar y con fecha desde hoy.
 
 ## MCP para agentes
 
@@ -169,9 +172,9 @@ Las fechas van en `AAAA-MM-DD` y las horas en `HH:MM`, en la hora local de Rubé
 | `proponer_variante_seccion` | Otra versión de una sección entera, sin activarla |
 | `comentar` | Una nota al margen, anclada a un trozo o al final del bloque |
 | `proponer_traduccion` | Crea el otro idioma en borrador, marcado `translatedWithAI`. Solo si aún no existe |
-| `leer_calendario` | Canales activos y publicaciones entre dos fechas (por defecto, 30 días desde hoy) |
-| `crear_publicacion` | Crea una publicación |
-| `cambiar_publicacion` | Mueve de fecha u hora, o cambia estado, texto, título, canal, formato o artículo |
+| `leer_calendario` | Canales activos, publicaciones entre dos fechas (por defecto, 30 días desde hoy) y las ideas sin fecha |
+| `crear_publicacion` | Crea una publicación. Canal, formato y fecha son opcionales: sin fecha, es una idea suelta |
+| `cambiar_publicacion` | Mueve de fecha u hora, o cambia estado, texto, título, canal, formato o artículo. Cadena vacía quita fecha, hora, canal, formato o artículo |
 | `borrar_publicacion` | Borra una publicación (deja lápida) |
 
 **Dos reglas distintas a propósito:**

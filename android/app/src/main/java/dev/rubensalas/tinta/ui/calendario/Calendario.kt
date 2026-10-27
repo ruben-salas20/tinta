@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -61,8 +62,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.rubensalas.tinta.data.Datos
+import dev.rubensalas.tinta.data.calendario.horaEntera
 import dev.rubensalas.tinta.data.calendario.longitud
 import dev.rubensalas.tinta.data.calendario.partir
+import dev.rubensalas.tinta.data.calendario.rangoHoras
 import dev.rubensalas.tinta.data.local.CanalE
 import dev.rubensalas.tinta.data.local.Parte
 import dev.rubensalas.tinta.data.local.PublicacionE
@@ -121,7 +124,7 @@ fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> 
                     else Tarjeta {
                         dias.entries.forEachIndexed { i, (f, ps) ->
                             if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = c.linea)
-                            Dia(fecha(f), ps, datos, onPublicacion)
+                            DiaPorHora(fecha(f), ps, datos, onPublicacion)
                         }
                     }
                     if (recientes.isNotEmpty()) {
@@ -219,6 +222,33 @@ private fun Dia(d: LocalDate?, ps: List<PublicacionE>, datos: Datos, onPublicaci
             for (p in ps) {
                 val extra = if (conFecha) fecha(p.fecha)?.let(::fechaCorta) else p.hora
                 FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, extra) { onPublicacion(p.id) }
+            }
+        }
+    }
+}
+
+/** Un día por horas: arriba la franja «Sin hora» y después una fila por hora de la rejilla. */
+@Composable
+private fun DiaPorHora(d: LocalDate?, ps: List<PublicacionE>, datos: Datos, onPublicacion: (String) -> Unit) {
+    val c = Tinta.colores
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (d != null) Column(Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${d.dayOfMonth}", style = Estilos.ui.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold), color = c.texto)
+            Text(diaCorto(d).uppercase(), style = Estilos.uiPeque.copy(fontSize = 11.sp), color = c.tenue)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            val sinHora = ps.filter { it.hora == null }
+            if (sinHora.isNotEmpty()) {
+                Text("Sin hora", style = Estilos.uiPeque, color = c.tenue)
+                for (p in sinHora) FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, null) { onPublicacion(p.id) }
+            }
+            for (h in rangoHoras(ps.mapNotNull { horaEntera(it.hora) })) Row(Modifier.heightIn(min = 28.dp), verticalAlignment = Alignment.Top) {
+                Text("%02d:00".format(h), Modifier.width(44.dp).padding(top = 6.dp), style = Estilos.uiPeque, color = c.tenue)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (p in ps.filter { horaEntera(it.hora) == h }) {
+                        FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, p.hora) { onPublicacion(p.id) }
+                    }
+                }
             }
         }
     }

@@ -1,11 +1,14 @@
 <script lang="ts">
   import { api, NOMBRE_ESTADO_PUB, ESTADOS_PUB, type Publicacion } from '../lib/api';
   import {
+    enHora,
     fechaCorta,
     fechaLarga,
+    horaEntera,
     nombreMes,
     nombreSemana,
     primeroDelMes,
+    rangoHoras,
     semanaDe,
     semanasDelMes,
     sumarDias,
@@ -75,6 +78,9 @@
     for (const p of pubs) m.set(p.fecha, [...(m.get(p.fecha) ?? []), p]);
     return m;
   });
+
+  // Las filas de la semana: de la primera a la última hora con publicación.
+  const horas = $derived(rangoHoras(pubs.map((p) => horaEntera(p.hora)).filter((h): h is number => h !== null)));
 
   const titulo = $derived(vista === 'semana' ? nombreSemana(ref) : nombreMes(ref));
   const mesRef = $derived(ref.slice(0, 7));
@@ -165,28 +171,39 @@
     ondragleave={() => encima === d && (encima = null)}
     ondrop={(e) => { e.preventDefault(); soltar(d); }}
   >
-    {#if vista === 'semana'}
-      <span class="cab-dia"><span class="num">{Number(d.slice(8))}</span><small>{fechaLarga(d).split(',')[0]}</small></span>
-    {:else}
-      <span class="num">{d.slice(8) === '01' || d === semanas[0][0] ? fechaCorta(d).split(' ').slice(1).join(' ') : Number(d.slice(8))}</span>
-    {/if}
+    <span class="num">{d.slice(8) === '01' || d === semanas[0][0] ? fechaCorta(d).split(' ').slice(1).join(' ') : Number(d.slice(8))}</span>
     {#each porDia.get(d) ?? [] as p (p.id)}
-      {#if vista === 'semana'}
-        {@const c = canal(p.canal_id)}
-        <button
-          class="pub {p.estado}"
-          class:sel={elegida === p.id}
-          draggable="true"
-          ondragstart={(e) => { arrastrando = p.id; e.dataTransfer?.setData('text/plain', p.id); }}
-          ondragend={() => (arrastrando = encima = null)}
-          onclick={(e) => abrir(e, p)}
-        >
-          <span class="linea-pub" title="{c?.nombre} · {formato(p)}"><Icono n={c?.icono ?? 'x'} red /><span class="h">{p.hora ?? 'sin hora'}</span></span>
-          <span class="t">{texto(p)}</span>
-        </button>
-      {:else}
-        {@render pub(p)}
-      {/if}
+      {@render pub(p)}
+    {/each}
+  </div>
+{/snippet}
+
+{#snippet celda(d: string, h: number | null)}
+  <div
+    class="celda {d < catalogo.hoy ? 'pasado' : ''}"
+    class:encima={encima === d}
+    role="gridcell"
+    tabindex="-1"
+    title="Clic para crear una publicación este día"
+    onclick={() => crear(d)}
+    onkeydown={(e) => e.key === 'Enter' && crear(d)}
+    ondragover={(e) => { e.preventDefault(); encima = d; }}
+    ondragleave={() => encima === d && (encima = null)}
+    ondrop={(e) => { e.preventDefault(); soltar(d); }}
+  >
+    {#each enHora(porDia.get(d) ?? [], h) as p (p.id)}
+      {@const c = canal(p.canal_id)}
+      <button
+        class="pub {p.estado}"
+        class:sel={elegida === p.id}
+        draggable="true"
+        ondragstart={(e) => { arrastrando = p.id; e.dataTransfer?.setData('text/plain', p.id); }}
+        ondragend={() => (arrastrando = encima = null)}
+        onclick={(e) => abrir(e, p)}
+      >
+        <span class="linea-pub" title="{c?.nombre} · {formato(p)}"><Icono n={c?.icono ?? 'x'} red />{#if p.hora}<span class="h">{p.hora}</span>{/if}</span>
+        <span class="t">{texto(p)}</span>
+      </button>
     {/each}
   </div>
 {/snippet}
@@ -220,8 +237,17 @@
             {#each semanas as s}{#each s as d (d)}{@render dia(d)}{/each}{/each}
           </div>
         {:else if vista === 'semana'}
-          <div class="semana-cols" role="grid">
-            {#each dias as d (d)}{@render dia(d)}{/each}
+          <div class="semana-horas" role="grid">
+            <span></span>
+            {#each dias as d (d)}
+              <span class="cab-dia"><span class="num">{Number(d.slice(8))}</span><small>{fechaLarga(d).split(',')[0]}</small></span>
+            {/each}
+            <span class="franja">Sin hora</span>
+            {#each dias as d (d)}{@render celda(d, null)}{/each}
+            {#each horas as h (h)}
+              <span class="franja">{String(h).padStart(2, '0')}:00</span>
+              {#each dias as d (d)}{@render celda(d, h)}{/each}
+            {/each}
           </div>
         {:else}
           {@const conPubs = [...porDia.keys()].sort()}

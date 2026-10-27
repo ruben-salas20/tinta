@@ -94,3 +94,28 @@ export function partir(texto: string, limite: number): [string, string] {
   const corte = justo ? cabe.length : frase > cabe.length / 2 ? frase + 1 : espacio > 0 ? espacio : cabe.length;
   return [cabe.slice(0, corte).trimEnd(), (cabe.slice(corte) + c.slice(limite).join('')).trimStart()];
 }
+
+/** La hora entera de «HH:MM», o null si la publicación no tiene hora. */
+export const horaEntera = (hora: string | null): number | null => (hora ? Number(hora.slice(0, 2)) : null);
+
+const horasEntre = (desde: number, hasta: number) => Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
+
+/**
+ * Las horas que muestra la rejilla: de la primera a la última con publicación,
+ * con un mínimo de 8. Sin ninguna, de 9:00 a 16:00.
+ */
+export function rangoHoras(horas: number[]): number[] {
+  if (!horas.length) return horasEntre(9, 16);
+  let desde = Math.min(...horas);
+  let hasta = Math.max(...horas);
+  if (hasta - desde < 7) {
+    hasta = Math.min(23, desde + 7);
+    desde = Math.max(0, hasta - 7);
+  }
+  return horasEntre(desde, hasta);
+}
+
+/** Las publicaciones de la hora `h`; con `h` null, las que no tienen hora. */
+export function enHora<T extends { hora: string | null }>(ps: T[], h: number | null): T[] {
+  return ps.filter((p) => horaEntera(p.hora) === h);
+}

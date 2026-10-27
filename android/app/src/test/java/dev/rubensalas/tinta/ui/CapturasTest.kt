@@ -25,6 +25,7 @@ import dev.rubensalas.tinta.ui.calendario.PantallaCalendario
 import dev.rubensalas.tinta.ui.calendario.PantallaPublicacion
 import dev.rubensalas.tinta.ui.comun.BarraInferior
 import dev.rubensalas.tinta.ui.comun.Seccion
+import dev.rubensalas.tinta.ui.editor.HojaFicha
 import dev.rubensalas.tinta.ui.editor.HojaVariantes
 import dev.rubensalas.tinta.ui.editor.PantallaConflicto
 import dev.rubensalas.tinta.ui.editor.PantallaEditor
@@ -85,6 +86,13 @@ class CapturasTest(private val oscuro: Boolean) {
         Box(Modifier.fillMaxSize()) {
             PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
             HojaVariantes(d.documentoDeBloque("b2")!!, {}, {}, {}, {})
+        }
+    }
+
+    @Test fun ficha() = capturar("4b-ficha") {
+        Box(Modifier.fillMaxSize()) {
+            PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
+            HojaFicha(d, d.articulo("llama")!!, Muestras.accionesEditor, onCerrar = {})
         }
     }
 

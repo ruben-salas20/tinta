@@ -5,6 +5,7 @@ import dev.rubensalas.tinta.data.api.EntradaHistorial
 import dev.rubensalas.tinta.data.local.ArticuloE
 import dev.rubensalas.tinta.data.local.BloqueE
 import dev.rubensalas.tinta.data.local.CanalE
+import dev.rubensalas.tinta.data.local.EtiquetaE
 import dev.rubensalas.tinta.data.local.Formato
 import dev.rubensalas.tinta.data.local.IdiomaE
 import dev.rubensalas.tinta.data.local.Parte
@@ -22,8 +23,8 @@ import java.time.LocalDate
 object Muestras {
     val hoy: LocalDate = LocalDate.parse("2026-10-26")
 
-    private fun a(id: String, estado: String, cambiado: String, serie: String? = null, parte: Long? = null) =
-        ArticuloE(id, id, estado, serie, parte, null, "2026-10-01", cambiado, 1)
+    private fun a(id: String, estado: String, cambiado: String, serie: String? = null, parte: Long? = null, etiquetas: List<String> = emptyList()) =
+        ArticuloE(id, id, estado, serie, parte, null, "2026-10-01", cambiado, 1, etiquetas = etiquetas)
 
     private fun i(art: String, titulo: String, desc: String) = IdiomaE("i-$art", art, "es", titulo, desc, ramaPrincipalId = "r-$art", rev = 1)
     private fun vb(id: String, b: String, cont: String, origen: String = "tu", creado: String = "2026-10-25T10:00:00Z") =
@@ -49,9 +50,10 @@ object Muestras {
     ).copy(articuloId = "llama")
 
     val datos = Datos(
-        series = listOf(SerieE("s1", "Montando ai-lab", 1)),
+        series = listOf(SerieE("s1", "Montando ai-lab", 1), SerieE("s2", "Torre en casa", 1)),
+        etiquetas = listOf("ia", "llama-swap", "docker", "gpu", "rtx 3050", "open source", "portfolio", "python", "vram").mapIndexed { i, n -> EtiquetaE("e$i", n, 1) },
         articulos = listOf(
-            a("llama", "borrador", "2026-10-26T09:00:00Z", "s1", 2),
+            a("llama", "borrador", "2026-10-26T09:00:00Z", "s1", 2, listOf("e0", "e1", "e2", "e3")),
             a("agentes", "revision", "2026-10-25T09:00:00Z"),
             a("atalaya", "listo", "2026-10-20T09:00:00Z", "s1", 3),
             a("copias", "idea", "2026-10-18T09:00:00Z"),

@@ -84,7 +84,7 @@ interface DaoTinta {
         VarianteSeccionE::class, BloqueE::class, VarianteBloqueE::class, MedioE::class, CanalE::class,
         PublicacionE::class, OperacionE::class, MedioPendienteE::class, AvisoE::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 @TypeConverters(Conversores::class)
@@ -106,8 +106,33 @@ abstract class BaseLocal : RoomDatabase() {
             }
         }
 
+        /**
+         * La versión 4 permite ideas sin fecha, sin canal y sin formato. SQLite no
+         * quita un NOT NULL con ALTER, así que se rehace la tabla. La tabla no tiene
+         * índices, así que no hay ninguno que volver a crear.
+         */
+        val MIGRACION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `publicaciones_nueva` (`id` TEXT NOT NULL, `canal_id` TEXT, `formato` TEXT, `fecha` TEXT, " +
+                        "`hora` TEXT, `estado` TEXT NOT NULL, `titulo` TEXT NOT NULL, `partes` TEXT NOT NULL, `articulo_id` TEXT, " +
+                        "`enlace` TEXT, `origen` TEXT NOT NULL, `creado` TEXT NOT NULL, `cambiado` TEXT NOT NULL, `rev` INTEGER NOT NULL, " +
+                        "`borrado` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "INSERT INTO `publicaciones_nueva` (`id`, `canal_id`, `formato`, `fecha`, `hora`, `estado`, `titulo`, `partes`, " +
+                        "`articulo_id`, `enlace`, `origen`, `creado`, `cambiado`, `rev`, `borrado`) " +
+                        "SELECT `id`, `canal_id`, `formato`, `fecha`, `hora`, `estado`, `titulo`, `partes`, " +
+                        "`articulo_id`, `enlace`, `origen`, `creado`, `cambiado`, `rev`, `borrado` FROM `publicaciones`",
+                )
+                db.execSQL("DROP TABLE `publicaciones`")
+                db.execSQL("ALTER TABLE `publicaciones_nueva` RENAME TO `publicaciones`")
+            }
+        }
+
         fun crear(context: Context): BaseLocal =
-            Room.databaseBuilder(context, BaseLocal::class.java, "tinta.db").addMigrations(MIGRACION_1_2, MIGRACION_2_3).build()
+            Room.databaseBuilder(context, BaseLocal::class.java, "tinta.db")
+                .addMigrations(MIGRACION_1_2, MIGRACION_2_3, MIGRACION_3_4).build()
 
         fun enMemoria(context: Context): BaseLocal =
             Room.inMemoryDatabaseBuilder(context, BaseLocal::class.java).allowMainThreadQueries().build()

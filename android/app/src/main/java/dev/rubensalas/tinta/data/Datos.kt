@@ -39,7 +39,7 @@ data class Datos(
     private val vbPorBloque by lazy { variantesBloque.groupBy { it.bloqueId } }
 
     fun articulo(id: String) = articulos.firstOrNull { it.id == id }
-    fun canal(id: String) = canales.firstOrNull { it.id == id }
+    fun canal(id: String?) = canales.firstOrNull { it.id == id }
     fun serie(id: String?) = series.firstOrNull { it.id == id }
 
     fun idiomasDe(articuloId: String) = idiomas.filter { it.articuloId == articuloId }.sortedByDescending { it.idioma }
@@ -105,11 +105,25 @@ data class Datos(
 
     /** Lo siguiente sin publicar de un artículo, desde [hoy]. */
     fun proxima(articuloId: String, hoy: String): PublicacionE? = publicaciones
-        .filter { it.articuloId == articuloId && it.estado != "publicada" && it.fecha >= hoy }
+        .filter { it.articuloId == articuloId && it.estado != "publicada" && it.fecha?.let { f -> f >= hoy } == true }
         .minWithOrNull(ORDEN)
+
+    /** Las ideas: publicaciones sin fecha, de la más reciente a la más antigua por [PublicacionE.cambiado]. */
+    fun ideas(): List<PublicacionE> = publicaciones
+        .filter { it.fecha == null && it.borrado == 0 }
+        .sortedByDescending { it.cambiado }
 
     companion object {
         val ORDEN = compareBy<PublicacionE>({ it.fecha }, { it.hora == null }, { it.hora })
+
+        /** Programada y publicada exigen fecha y canal. Idea y preparando no. */
+        fun estadoPermitido(estado: String, p: PublicacionE): Boolean =
+            estado == "idea" || estado == "preparando" || (p.fecha != null && p.canalId != null)
+
+        /** El título, o si no tiene, la primera línea de su texto. Así una idea suelta se reconoce en la lista. */
+        fun tituloDe(p: PublicacionE): String = p.titulo.ifBlank {
+            Critic.limpio(p.partes.firstOrNull()?.texto.orEmpty()).lines().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        }.ifBlank { "Sin título" }
     }
 }
 

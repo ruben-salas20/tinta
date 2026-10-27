@@ -257,9 +257,10 @@ class Repositorio(
 
     // --- Calendario
 
-    suspend fun crearPublicacion(canalId: String, formato: String, fecha: String, hora: String?, titulo: String, articuloId: String?): String {
+    /** Sin [canalId], [formato], [fecha] ni [hora] es una idea: va a la pestaña «Ideas». */
+    suspend fun crearPublicacion(canalId: String?, formato: String?, fecha: String?, hora: String?, titulo: String, articuloId: String?): String {
         val p = buildJsonObject {
-            put("canal_id", canalId); put("formato", formato); put("fecha", fecha)
+            canalId?.let { put("canal_id", it) }; formato?.let { put("formato", it) }; fecha?.let { put("fecha", it) }
             hora?.let { put("hora", it) }; put("titulo", titulo); articuloId?.let { put("articulo_id", it) }
             put("partes", json.encodeToJsonElement(ListSerializer(Parte.serializer()), listOf(Parte())))
         }

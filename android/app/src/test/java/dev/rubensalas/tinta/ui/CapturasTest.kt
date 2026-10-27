@@ -172,13 +172,17 @@ class CapturasTest(private val oscuro: Boolean) {
     }
 
     @Test fun calendario() = capturar("6a-calendario") {
-        ConBarra(Seccion.Calendario) { PantallaCalendario(d, Muestras.hoy, onPublicacion = {}, onNueva = {}) }
+        ConBarra(Seccion.Calendario) { PantallaCalendario(d, Muestras.hoy, onPublicacion = {}, onNueva = {}, onNuevaIdea = {}) }
+    }
+
+    @Test fun calendarioIdeas() = capturar("6a3-calendario-ideas") {
+        ConBarra(Seccion.Calendario) { PantallaCalendario(d, Muestras.hoy, onPublicacion = {}, onNueva = {}, onNuevaIdea = {}, vistaInicial = "ideas") }
     }
 
     @Test fun calendarioMes() = capturar("6a2-calendario-mes") {
         // Tres publicaciones más el 27 para que aparezca el «+N» en la celda.
         val extra = (1..3).map { d.publicaciones.first { p -> p.id == "p2" }.copy(id = "e$it", fecha = "2026-10-27") }
-        ConBarra(Seccion.Calendario) { PantallaCalendario(d.copy(publicaciones = d.publicaciones + extra), Muestras.hoy, onPublicacion = {}, onNueva = {}, vistaInicial = "mes") }
+        ConBarra(Seccion.Calendario) { PantallaCalendario(d.copy(publicaciones = d.publicaciones + extra), Muestras.hoy, onPublicacion = {}, onNueva = {}, onNuevaIdea = {}, vistaInicial = "mes") }
     }
 
     @Test fun publicacion() = capturar("6b-publicacion") {

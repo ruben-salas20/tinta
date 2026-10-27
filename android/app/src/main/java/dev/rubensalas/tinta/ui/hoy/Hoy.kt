@@ -80,7 +80,7 @@ fun PantallaHoy(
     val c = Tinta.colores
     val r = Resumen.calcular(datos.publicaciones, hoy)
     val semana = datos.publicaciones.count { p ->
-        p.estado != "publicada" && fecha(p.fecha)?.let { !it.isBefore(hoy) && it.isBefore(hoy.plusDays(7)) } == true
+        p.estado != "publicada" && p.fecha?.let(::fecha)?.let { !it.isBefore(hoy) && it.isBefore(hoy.plusDays(7)) } == true
     }
     val proximos = (0L until 7L).map { hoy.plusDays(it) }.mapNotNull { d ->
         val ps = datos.publicaciones.filter { it.fecha == d.toString() }.sortedWith(Datos.ORDEN)
@@ -107,7 +107,7 @@ fun PantallaHoy(
                     Grupo("Atrasadas")
                     Tarjeta {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            for (p in r.atrasadas) FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, fecha(p.fecha)?.let(::fechaCorta)) { onPublicacion(p.id) }
+                            for (p in r.atrasadas) FilaPublicacion(datos.canal(p.canalId)?.icono ?: "", p.titulo, p.estado, p.fecha?.let(::fecha)?.let(::fechaCorta)) { onPublicacion(p.id) }
                         }
                     }
                 }

@@ -66,7 +66,7 @@ object Avisos {
     private fun puede(context: Context) =
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun mostrarResumen(context: Context, r: Resumen, nombreCanal: (String) -> String) {
+    fun mostrarResumen(context: Context, r: Resumen, nombreCanal: (String?) -> String) {
         if (!puede(context)) return
         val estilo = android.app.Notification.InboxStyle()
         r.lineas(nombreCanal).take(6).forEach { estilo.addLine(it) }
@@ -112,7 +112,7 @@ class ResumenReceiver : BroadcastReceiver() {
                 val pubs = c.base.dao().todasPublicaciones()
                 val datos = c.repositorio.datos.value
                 val r = Resumen.calcular(pubs, LocalDate.now())
-                Avisos.mostrarResumen(context, r) { id -> datos.canal(id)?.nombre ?: id }
+                Avisos.mostrarResumen(context, r) { id -> id?.let { datos.canal(it)?.nombre ?: it } ?: "Sin canal" }
                 Avisos.programar(context, c.ajustes.actual().horaResumen)
             } finally {
                 fin.finish()

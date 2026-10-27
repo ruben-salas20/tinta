@@ -4,7 +4,7 @@
   import { contar, partir } from '../lib/calendario';
   import { avisar, canal, catalogo, confirmar, difusion, fallo, ir, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
   import { esImagen, iconoDeMedio } from '../lib/medios';
-  import { estadoPermitido, exigeFechaYCanal, faltaParaSalir } from '../lib/ideas';
+  import { estadoPermitido, exigeFechaYCanal, faltaParaSalir, formatoPara } from '../lib/ideas';
   import { copiarTexto } from '../lib/portapapeles';
   import Icono from './Icono.svelte';
 
@@ -87,14 +87,15 @@
     }
   });
 
-  // Sin canal no hay formato. Con canal, si el formato no es suyo, se elige el primero.
+  // Sin canal no hay formato. Con canal, si el formato no es suyo, se elige otro:
+  // con varias partes, uno que las admita, para no juntarlas sin querer.
   function cambiarCanal(nuevo: string | null) {
     if (!p) return;
     p.canal_id = nuevo;
     if (!nuevo) p.formato = null;
     else {
       const fs = canal(nuevo)?.formatos ?? [];
-      if (!fs.some((f) => f.id === p!.formato)) p.formato = fs[0]?.id ?? null;
+      if (!fs.some((f) => f.id === p!.formato)) p.formato = formatoPara(fs, p.partes.length)?.id ?? null;
     }
     ajustarPartes();
     programar(true);

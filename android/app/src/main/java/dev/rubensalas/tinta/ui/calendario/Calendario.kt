@@ -66,7 +66,9 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.rubensalas.tinta.data.Datos
 import dev.rubensalas.tinta.data.calendario.esImagen
+import dev.rubensalas.tinta.data.calendario.formatoPara
 import dev.rubensalas.tinta.data.calendario.horaEntera
+import dev.rubensalas.tinta.data.calendario.juntar
 import dev.rubensalas.tinta.data.calendario.longitud
 import dev.rubensalas.tinta.data.calendario.partir
 import dev.rubensalas.tinta.data.calendario.rangoHoras
@@ -296,6 +298,8 @@ private fun List<PublicacionE>.porDia(): Map<String, List<PublicacionE>> =
 interface AccionesPublicacion {
     fun cambiar(campos: Map<String, String?>)
     fun partes(partes: List<Parte>)
+    /** Guarda [partes] y después [campos], en ese orden: el servicio valida el resultado de cada paso. */
+    fun partesYCambiar(partes: List<Parte>, campos: Map<String, String?>)
     fun publicada(enlace: String)
     fun borrar()
     fun copiar(texto: String)
@@ -364,10 +368,16 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
                 Campo("Canal") {
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (canal == null) Text("Sin canal", style = Estilos.ui, color = c.tenue)
-                        // El canal y su formato van juntos: al elegir un canal se toma su primer formato.
+                        // El canal y su formato van juntos. El servicio valida el resultado entero:
+                        // si hay que juntar partes, se guardan antes que el formato.
                         for (k in datos.canales.filter { (it.activo == 1 && it.formatos.isNotEmpty()) || it.id == p.canalId }) Chip(
                             k.nombre, lleno = k.id == p.canalId,
-                            onClick = { acciones.cambiar(mapOf("canal_id" to k.id, "formato" to k.formatos.firstOrNull()?.id)) },
+                            onClick = {
+                                val f = formatoPara(k.formatos, partes.size)
+                                val campos = mapOf("canal_id" to k.id, "formato" to f?.id)
+                                if (f != null && !f.partes && partes.size > 1) { partes = juntar(partes); acciones.partesYCambiar(partes, campos) }
+                                else acciones.cambiar(campos)
+                            },
                             icono = { IconoRed(k.icono, tam = 13.dp, color = if (k.id == p.canalId) c.sobreTinta else c.texto) },
                         )
                     }
@@ -378,9 +388,8 @@ fun PantallaPublicacion(datos: Datos, publicacionId: String, acciones: AccionesP
                     Campo("Formato") {
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             for (f in canal.formatos) Chip(f.nombre, lleno = f.id == p.formato, onClick = {
-                                val nuevas = if (!f.partes && partes.size > 1) listOf(Parte(partes.joinToString("\n\n") { it.texto }, partes.flatMap { it.medios })) else null
-                                acciones.cambiar(mapOf("formato" to f.id))
-                                if (nuevas != null) partes = nuevas
+                                if (!f.partes && partes.size > 1) { partes = juntar(partes); acciones.partesYCambiar(partes, mapOf("formato" to f.id)) }
+                                else acciones.cambiar(mapOf("formato" to f.id))
                             })
                         }
                     }

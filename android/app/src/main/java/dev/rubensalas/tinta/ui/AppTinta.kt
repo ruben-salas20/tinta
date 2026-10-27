@@ -332,6 +332,12 @@ private fun accionesPublicacion(
         }
     }
     override fun partes(partes: List<Parte>) { scope.launch { c.repositorio.cambiarPartes(id, partes) } }
+    override fun partesYCambiar(partes: List<Parte>, campos: Map<String, String?>) {
+        scope.launch {
+            c.repositorio.cambiarPartes(id, partes)
+            c.repositorio.cambiarPublicacion(id, JsonObject(campos.mapValues { (_, v) -> v?.let(::JsonPrimitive) ?: JsonNull }))
+        }
+    }
     override fun publicada(enlace: String) { scope.launch { c.repositorio.marcarPublicada(id, enlace) } }
     override fun borrar() { scope.launch { c.repositorio.borrarPublicacion(id) }; nav.popBackStack() }
     override fun copiar(texto: String) = copiar(Critic.limpio(texto))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Publicacion } from './api';
-import { estadoPermitido, faltaParaSalir, ordenarIdeas, resumenIdea, tituloDe } from './ideas';
+import { estadoPermitido, faltaParaSalir, formatoPara, ordenarIdeas, resumenIdea, tituloDe } from './ideas';
 
 const base: Publicacion = {
   id: 'p1',
@@ -83,5 +83,16 @@ describe('texto que resume una idea', () => {
       canal: 'X',
       estado: 'Preparando',
     });
+  });
+});
+
+describe('formatoPara', () => {
+  const post = { id: 'post', nombre: 'Post', limite: 280, partes: false };
+  const hilo = { id: 'hilo', nombre: 'Hilo', limite: 280, partes: true };
+  it('con varias partes prefiere un formato que las admita', () => {
+    expect(formatoPara([post, hilo], 3)?.id).toBe('hilo');
+    expect(formatoPara([post, hilo], 1)?.id).toBe('post');
+    expect(formatoPara([post], 3)?.id).toBe('post');
+    expect(formatoPara([], 2)).toBeUndefined();
   });
 });

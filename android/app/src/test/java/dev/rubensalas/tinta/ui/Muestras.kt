@@ -145,6 +145,7 @@ object Muestras {
     val accionesPublicacion = object : AccionesPublicacion {
         override fun cambiar(campos: Map<String, String?>) = Unit
         override fun partes(partes: List<Parte>) = Unit
+        override fun partesYCambiar(partes: List<Parte>, campos: Map<String, String?>) = Unit
         override fun publicada(enlace: String) = Unit
         override fun borrar() = Unit
         override fun copiar(texto: String) = Unit

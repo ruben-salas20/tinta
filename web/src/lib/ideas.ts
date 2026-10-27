@@ -1,7 +1,7 @@
 // Ideas: publicaciones sin fecha. Sin fecha solo pueden ser idea o preparando.
 // Programada y publicada exigen fecha y canal; el servicio hace la misma comprobación.
 
-import { NOMBRE_ESTADO_PUB, type Canal, type EstadoPub, type Publicacion } from './api';
+import { NOMBRE_ESTADO_PUB, type Canal, type EstadoPub, type Formato, type Publicacion } from './api';
 
 export function exigeFechaYCanal(estado: EstadoPub): boolean {
   return estado === 'programada' || estado === 'publicada';
@@ -40,4 +40,9 @@ export function resumenIdea(p: Publicacion, canales: Canal[]) {
     canal: p.canal_id ? (nombre ?? p.canal_id) : 'Sin canal',
     estado: NOMBRE_ESTADO_PUB[p.estado],
   };
+}
+
+/** El formato que se toma al elegir un canal: con varias partes, uno que las admita si lo hay. */
+export function formatoPara(formatos: Formato[], nPartes: number): Formato | undefined {
+  return formatos.find((f) => nPartes > 1 && f.partes) ?? formatos[0];
 }

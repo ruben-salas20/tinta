@@ -151,17 +151,18 @@ fun PantallaEditor(
     val bloqueFoco: BloqueVista? = foco?.let { id -> doc.flatMap { it.bloques }.firstOrNull { it.bloque.id == id } }
     val vsFoco = foco?.let { id -> doc.firstOrNull { s -> s.bloques.any { it.bloque.id == id } }?.activa }
     val activaFoco = bloqueFoco?.activa
+    val tipoFoco = bloqueFoco?.bloque?.tipo ?: "parrafo"
 
     // Estado del campo del bloque con foco. Se rehace al cambiar de bloque o de
     // variante, y cuando llega otro texto de fuera (una sincronización) sin que
     // haya nada escrito pendiente de guardar.
-    var edicion by remember { mutableStateOf(Edicion.desde("")) }
+    var edicion by remember { mutableStateOf(Edicion.desde("", tipoFoco)) }
     var valor by remember { mutableStateOf(TextFieldValue("")) }
     var guardado by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(activaFoco?.id, activaFoco?.contenido) {
+    LaunchedEffect(activaFoco?.id, activaFoco?.contenido, tipoFoco) {
         val cont = activaFoco?.contenido ?: return@LaunchedEffect
         if (guardado == null || cont != guardado && edicion.aMarkup() == guardado) {
-            edicion = Edicion.desde(cont)
+            edicion = Edicion.desde(cont, tipoFoco)
             valor = TextFieldValue(edicion.texto, TextRange(edicion.texto.length))
             guardado = cont
         }
@@ -193,7 +194,7 @@ fun PantallaEditor(
     }
 
     fun nuevoMarkup(m: String) {
-        edicion = Edicion.desde(m)
+        edicion = Edicion.desde(m, tipoFoco)
         valor = TextFieldValue(edicion.texto, TextRange(valor.selection.start.coerceAtMost(edicion.texto.length)))
     }
 

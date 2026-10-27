@@ -57,7 +57,7 @@ fn herramientas() -> Value {
         },
         {
             "name": "proponer_cambio",
-            "description": "Propone un cambio dentro de un bloque, sobre un trozo de su texto que exista tal cual y no esté ya marcado. accion: cambiar (por texto), quitar, o anadir (texto justo después del trozo).",
+            "description": "Propone un cambio dentro de un bloque, sobre un trozo de su texto que exista tal cual y no esté ya marcado. accion: cambiar (por texto), quitar, o anadir (texto justo después del trozo). El trozo no puede cortar un enlace ni un código en línea.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -94,7 +94,7 @@ fn herramientas() -> Value {
         },
         {
             "name": "comentar",
-            "description": "Deja una nota al margen en un bloque, anclada a un trozo de su texto o al final.",
+            "description": "Deja una nota al margen en un bloque, anclada a un trozo de su texto o al final. El ancla no puede cortar un enlace ni un código en línea.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -237,6 +237,14 @@ pub fn atender(c: &mut Connection, agente: &str, msg: &Value) -> Option<Value> {
     })
 }
 
+fn fallo_markdown(f: critic::Fallo) -> String {
+    match f {
+        critic::Fallo::Enlace => "Ese trozo corta un enlace o cae dentro de su «](url)», y el Markdown se rompería. Marca solo el texto visible del enlace o el enlace entero.".into(),
+        critic::Fallo::Codigo => "Ese trozo corta un código en línea o cae dentro de él, y el Markdown se rompería. Marca el código entero, con sus comillas invertidas.".into(),
+        critic::Fallo::NoEsta => "No encuentro ese trozo en el texto sin marcar del bloque.".into(),
+    }
+}
+
 fn texto_error(e: Error) -> String {
     match e {
         Error::NoExiste(q) => format!("No existe: {q}."),
@@ -283,8 +291,9 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
                 (otra, _) => return Err(format!("Acción desconocida: {otra}.")),
             };
             editar_activa(c, &a.bloque_id, |s| {
-                critic::proponer(s, &a.buscar, p, agente).ok_or_else(|| {
-                    "No encuentro ese trozo en el texto sin marcar del bloque. Cópialo tal cual de leer_articulo; si ya está marcado, no se puede volver a marcar.".to_string()
+                critic::proponer(s, &a.buscar, p, agente).map_err(|f| match f {
+                    critic::Fallo::NoEsta => "No encuentro ese trozo en el texto sin marcar del bloque. Cópialo tal cual de leer_articulo; si ya está marcado, no se puede volver a marcar.".to_string(),
+                    otro => fallo_markdown(otro),
                 })
             })
             .map(|_| "Propuesta guardada en el bloque.".to_string())
@@ -322,7 +331,10 @@ fn llamar(c: &mut Connection, agente: &str, nombre: &str, a: Value) -> Result<St
             }
             let a: A = args(a)?;
             editar_activa(c, &a.bloque_id, |s| {
-                critic::anotar(s, &a.nota, a.ancla.as_deref(), agente).ok_or_else(|| "No encuentro el ancla en el texto sin marcar del bloque.".to_string())
+                critic::anotar(s, &a.nota, a.ancla.as_deref(), agente).map_err(|f| match f {
+                    critic::Fallo::NoEsta => "No encuentro el ancla en el texto sin marcar del bloque.".to_string(),
+                    otro => fallo_markdown(otro),
+                })
             })
             .map(|_| "Nota guardada.".to_string())
         }

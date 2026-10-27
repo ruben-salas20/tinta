@@ -204,17 +204,95 @@ pub enum Propuesta {
     Anadir(String),
 }
 
+/// Por qué no se puede marcar un trozo de texto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fallo {
+    /// No está en el texto sin marcas.
+    NoEsta,
+    /// Corta un enlace o cae dentro de su `](url)`.
+    Enlace,
+    /// Corta un código en línea o cae dentro de él.
+    Codigo,
+}
+
+/// Un trozo de Markdown que una marca no puede cortar.
+struct Zona {
+    desde: usize,
+    hasta: usize,
+    /// Si la marca puede abarcarla entera.
+    abarcable: bool,
+    /// El texto visible de un enlace, que sí se puede marcar por dentro.
+    visible: Option<(usize, usize)>,
+    fallo: Fallo,
+}
+
+fn zonas(x: &str) -> Vec<Zona> {
+    let mut zonas = Vec::new();
+    let b = x.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] != b'`' {
+            i += 1;
+            continue;
+        }
+        let n = b[i..].iter().take_while(|&&c| c == b'`').count();
+        let mut j = i + n;
+        let mut cierre = None;
+        while j < b.len() {
+            let m = b[j..].iter().take_while(|&&c| c == b'`').count();
+            if m == n {
+                cierre = Some(j + m);
+                break;
+            }
+            j += m.max(1);
+        }
+        match cierre {
+            Some(fin) => {
+                zonas.push(Zona { desde: i, hasta: fin, abarcable: true, visible: None, fallo: Fallo::Codigo });
+                i = fin;
+            }
+            None => i += n,
+        }
+    }
+    for (cierre, _) in x.match_indices("](") {
+        let Some(fin) = x[cierre + 2..].find(')').map(|f| cierre + 2 + f + 1) else { continue };
+        // Si el «[» queda en otro trozo, el enlace no se puede abarcar desde aquí.
+        let zona = match x[..cierre].rfind('[') {
+            Some(abre) => {
+                let desde = if x[..abre].ends_with('!') { abre - 1 } else { abre };
+                Zona { desde, hasta: fin, abarcable: true, visible: Some((abre + 1, cierre)), fallo: Fallo::Enlace }
+            }
+            None => Zona { desde: cierre, hasta: fin, abarcable: false, visible: None, fallo: Fallo::Enlace },
+        };
+        zonas.push(zona);
+    }
+    zonas
+}
+
+/// Comprueba que marcar `x[i..j]` no rompe el Markdown.
+fn se_puede_marcar(x: &str, i: usize, j: usize) -> Result<(), Fallo> {
+    for z in zonas(x) {
+        let fuera = j <= z.desde || i >= z.hasta;
+        let entera = z.abarcable && i <= z.desde && j >= z.hasta;
+        let visible = z.visible.is_some_and(|(a, b)| i >= a && j <= b);
+        if !(fuera || entera || visible) {
+            return Err(z.fallo);
+        }
+    }
+    Ok(())
+}
+
 /// Marca la primera aparición de `buscar` como propuesta del agente `ia`.
 /// Solo busca en el texto sin marcas: no se propone sobre otra propuesta.
-/// Devuelve `None` si no lo encuentra.
-pub fn proponer(s: &str, buscar: &str, p: Propuesta, ia: &str) -> Option<String> {
+pub fn proponer(s: &str, buscar: &str, p: Propuesta, ia: &str) -> Result<String, Fallo> {
     if buscar.is_empty() {
-        return None;
+        return Err(Fallo::NoEsta);
     }
     let mut trozos = leer(s);
-    let pos = trozos.iter().position(|t| matches!(t, Trozo::Texto(x) if x.contains(buscar)))?;
+    let pos = trozos.iter().position(|t| matches!(t, Trozo::Texto(x) if x.contains(buscar))).ok_or(Fallo::NoEsta)?;
     let Trozo::Texto(x) = trozos[pos].clone() else { unreachable!() };
     let i = x.find(buscar).unwrap();
+    se_puede_marcar(&x, i, i + buscar.len())?;
     let (antes, despues) = (&x[..i], &x[i + buscar.len()..]);
     let ia = Some(ia.to_string());
     let mut nuevos = vec![Trozo::Texto(antes.into())];
@@ -228,19 +306,20 @@ pub fn proponer(s: &str, buscar: &str, p: Propuesta, ia: &str) -> Option<String>
     }
     nuevos.push(Trozo::Texto(despues.into()));
     trozos.splice(pos..=pos, nuevos.into_iter().filter(|t| !matches!(t, Trozo::Texto(x) if x.is_empty())));
-    Some(escribir(&trozos))
+    Ok(escribir(&trozos))
 }
 
 /// Nota del agente anclada a `ancla`, o al final del texto si no se da.
-pub fn anotar(s: &str, nota: &str, ancla: Option<&str>, ia: &str) -> Option<String> {
+pub fn anotar(s: &str, nota: &str, ancla: Option<&str>, ia: &str) -> Result<String, Fallo> {
     let marca = format!("{{>>ia:{ia}: {}<<}}", nota.replace("<<}", "<< }"));
     let Some(ancla) = ancla.filter(|a| !a.is_empty()) else {
-        return Some(format!("{}{}{marca}", s.trim_end(), if s.trim().is_empty() { "" } else { " " }));
+        return Ok(format!("{}{}{marca}", s.trim_end(), if s.trim().is_empty() { "" } else { " " }));
     };
     let mut trozos = leer(s);
-    let pos = trozos.iter().position(|t| matches!(t, Trozo::Texto(x) if x.contains(ancla)))?;
+    let pos = trozos.iter().position(|t| matches!(t, Trozo::Texto(x) if x.contains(ancla))).ok_or(Fallo::NoEsta)?;
     let Trozo::Texto(x) = trozos[pos].clone() else { unreachable!() };
     let i = x.find(ancla).unwrap();
+    se_puede_marcar(&x, i, i + ancla.len())?;
     let nuevos = [
         Trozo::Texto(x[..i].into()),
         Trozo::Resaltado(ancla.into()),
@@ -248,7 +327,7 @@ pub fn anotar(s: &str, nota: &str, ancla: Option<&str>, ia: &str) -> Option<Stri
         Trozo::Texto(x[i + ancla.len()..].into()),
     ];
     trozos.splice(pos..=pos, nuevos.into_iter().filter(|t| !matches!(t, Trozo::Texto(x) if x.is_empty())));
-    Some(escribir(&trozos))
+    Ok(escribir(&trozos))
 }
 
 #[cfg(test)]
@@ -309,8 +388,8 @@ mod pruebas {
         assert_eq!(proponer(base, " dura", Propuesta::Quitar, "c").unwrap(), "El ttl dice cuánto {--muy--}{-- dura--}{>>ia:c<<}.");
         assert_eq!(proponer(base, "cuánto", Propuesta::Anadir(" tiempo".into()), "c").unwrap(), "El ttl dice cuánto{++ tiempo++}{>>ia:c<<} {--muy--} dura.");
         // No propone sobre lo que ya está marcado, ni sobre lo que no existe.
-        assert!(proponer(base, "muy", Propuesta::Quitar, "c").is_none());
-        assert!(proponer(base, "nada", Propuesta::Quitar, "c").is_none());
+        assert_eq!(proponer(base, "muy", Propuesta::Quitar, "c"), Err(Fallo::NoEsta));
+        assert_eq!(proponer(base, "nada", Propuesta::Quitar, "c"), Err(Fallo::NoEsta));
         let r = proponer(base, "ttl", Propuesta::Quitar, "c").unwrap();
         assert_eq!(limpio_prosa(&r), "El ttl dice cuánto dura.");
 
@@ -318,6 +397,30 @@ mod pruebas {
         assert_eq!(anotar("Hola", "fin", None, "c").unwrap(), "Hola {>>ia:c: fin<<}");
         let t = leer(&anotar("Hola mundo", "x", Some("mundo"), "c").unwrap());
         assert!(matches!(&t[2], Trozo::Nota { ia: Some(n), .. } if n == "c"));
-        assert!(anotar("Hola", "x", Some("adiós"), "c").is_none());
+        assert_eq!(anotar("Hola", "x", Some("adiós"), "c"), Err(Fallo::NoEsta));
+    }
+
+    #[test]
+    fn no_marca_dentro_de_un_enlace_ni_de_codigo() {
+        let base = "Lee [la guía](https://ejemplo.dev/guia) y usa `ttl: 300` ya.";
+        let quitar = |b: &str| proponer(base, b, Propuesta::Quitar, "c");
+        assert_eq!(quitar("ejemplo"), Err(Fallo::Enlace));
+        assert_eq!(quitar("guía]("), Err(Fallo::Enlace));
+        assert_eq!(quitar("Lee [la"), Err(Fallo::Enlace));
+        assert_eq!(quitar("guia) y"), Err(Fallo::Enlace));
+        assert_eq!(quitar("300"), Err(Fallo::Codigo));
+        assert_eq!(quitar("usa `ttl"), Err(Fallo::Codigo));
+        assert_eq!(anotar(base, "x", Some("ejemplo.dev"), "c"), Err(Fallo::Enlace));
+        assert_eq!(anotar(base, "x", Some("ttl"), "c"), Err(Fallo::Codigo));
+        // El texto visible, el enlace entero y el código entero sí valen.
+        assert!(quitar("la guía").is_ok());
+        assert!(quitar("guí").is_ok());
+        assert!(quitar("[la guía](https://ejemplo.dev/guia)").is_ok());
+        assert!(quitar("`ttl: 300`").is_ok());
+        assert!(anotar(base, "x", Some("la guía"), "c").is_ok());
+        assert_eq!(proponer("![logo](a.png) fin", "[logo](a.png)", Propuesta::Quitar, "c"), Err(Fallo::Enlace));
+        assert!(proponer("![logo](a.png) fin", "![logo](a.png)", Propuesta::Quitar, "c").is_ok());
+        // Un «](» que no cierra no es un enlace.
+        assert!(proponer("a ](b sin cierre", "(b", Propuesta::Quitar, "c").is_ok());
     }
 }

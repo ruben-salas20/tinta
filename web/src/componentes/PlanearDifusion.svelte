@@ -78,21 +78,21 @@
         <h3><Icono n="check" />{hechas.length === 1 ? 'Una publicación nueva' : `${hechas.length} publicaciones nuevas`} en el calendario</h3>
         <ul class="hechas">
           {#each hechas as p (p.id)}
-            <li><Icono n={canal(p.canal_id)?.icono ?? 'x'} red />{fechaCorta(p.fecha)}{p.hora ? ` · ${p.hora}` : ''} · {canal(p.canal_id)?.nombre}</li>
+            <li><Icono n={canal(p.canal_id)?.icono ?? 'x'} red />{p.fecha ? fechaCorta(p.fecha) : 'Sin fecha'}{p.hora ? ` · ${p.hora}` : ''} · {canal(p.canal_id)?.nombre}</li>
           {/each}
         </ul>
         <p>Nacen como idea, con la descripción del artículo como primer borrador del texto.</p>
         <div class="v-pie">
           <button class="btn" onclick={alCerrar}>Seguir escribiendo</button>
           <span class="espacio"></span>
-          <button class="btn primario" onclick={() => ir(`/calendario?fecha=${hechas![0].fecha}`)}><Icono n="calendario" s />Ir al calendario</button>
+          <button class="btn primario" onclick={() => ir(hechas![0].fecha ? `/calendario?fecha=${hechas![0].fecha}` : '/calendario?vista=ideas')}><Icono n="calendario" s />Ir al calendario</button>
         </div>
       </div>
     {:else}
       <div class="col">
         <p>Elige dónde y cuándo sale este artículo. Cada fila es una publicación del calendario.</p>
         {#if existentes.length}
-          <div class="aviso-ya">Ya hay {existentes.length === 1 ? 'una publicación' : `${existentes.length} publicaciones`} de este artículo: {existentes.map((p) => `${canal(p.canal_id)?.nombre} ${fechaCorta(p.fecha)}`).join(', ')}. Las nuevas se suman.</div>
+          <div class="aviso-ya">Ya hay {existentes.length === 1 ? 'una publicación' : `${existentes.length} publicaciones`} de este artículo: {existentes.map((p) => `${canal(p.canal_id)?.nombre} ${p.fecha ? fechaCorta(p.fecha) : 'sin fecha'}`).join(', ')}. Las nuevas se suman.</div>
         {/if}
         <div class="filas">
           {#each filas as f (f.canal_id)}

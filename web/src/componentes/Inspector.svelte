@@ -203,9 +203,10 @@
     <h3><Icono n="difundir" s />Difusión<span class="n">{pubs.length || ''}</span></h3>
     {#if pubs.length}
       {#each pubs as p (p.id)}
-        <a class="pub-d" href="/calendario?fecha={p.fecha}&p={p.id}" onclick={(e) => { e.preventDefault(); ir(`/calendario?fecha=${p.fecha}&p=${p.id}`); }}>
+        {@const destino = p.fecha ? `/calendario?fecha=${p.fecha}&p=${p.id}` : `/calendario?vista=ideas&p=${p.id}`}
+        <a class="pub-d" href={destino} onclick={(e) => { e.preventDefault(); ir(destino); }}>
           <Icono n={canal(p.canal_id)?.icono ?? 'x'} red />
-          <span class="f">{fechaCorta(p.fecha)}{p.hora ? ` · ${p.hora}` : ''}</span>
+          <span class="f">{p.fecha ? fechaCorta(p.fecha) : 'Sin fecha'}{p.hora ? ` · ${p.hora}` : ''}</span>
           <span class="chip punto e-{p.estado}">{NOMBRE_ESTADO_PUB[p.estado]}</span>
         </a>
       {/each}

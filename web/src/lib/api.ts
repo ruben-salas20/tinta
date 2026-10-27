@@ -84,9 +84,12 @@ export interface Parte {
 export type EstadoPub = 'idea' | 'preparando' | 'programada' | 'publicada';
 export interface Publicacion {
   id: string;
-  canal_id: string;
-  formato: string;
-  fecha: string;
+  /** null si es una idea sin canal. */
+  canal_id: string | null;
+  /** null si no hay canal: formato y canal van juntos. */
+  formato: string | null;
+  /** null si es una idea sin fecha. */
+  fecha: string | null;
   hora: string | null;
   estado: EstadoPub;
   titulo: string;
@@ -105,9 +108,9 @@ export interface Plan {
   hora: string | null;
 }
 export interface CambioPublicacion {
-  canal_id?: string;
-  formato?: string;
-  fecha?: string;
+  canal_id?: string | null;
+  formato?: string | null;
+  fecha?: string | null;
   hora?: string | null;
   estado?: EstadoPub;
   titulo?: string;
@@ -298,12 +301,13 @@ export const api = {
   hoy: () => get<{ fecha: string; zona: string }>('/hoy'),
   canales: () => get<Canal[]>('/canales'),
   cambiarCanal: (id: string, c: { activo?: boolean; nombre?: string }) => patch<Canal>(`/canales/${id}`, c),
-  publicaciones: (f: { desde?: string; hasta?: string; canal?: string; articulo?: string }) => {
-    const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]);
+  publicaciones: (f: { desde?: string; hasta?: string; canal?: string; articulo?: string; sin_fecha?: boolean }) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v) q.set(k, String(v));
     return get<Publicacion[]>(`/publicaciones?${q}`);
   },
   publicacion: (id: string) => get<Publicacion>(`/publicaciones/${id}`),
-  crearPublicacion: (p: CambioPublicacion & { canal_id: string; formato: string; fecha: string }) => post<Publicacion>('/publicaciones', p),
+  crearPublicacion: (p: CambioPublicacion) => post<Publicacion>('/publicaciones', p),
   cambiarPublicacion: (id: string, c: CambioPublicacion) => patch<Publicacion>(`/publicaciones/${id}`, c),
   borrarPublicacion: (id: string) => del<void>(`/publicaciones/${id}`),
   difusion: (articuloId: string, planes: Plan[]) => post<Publicacion[]>(`/articulos/${articuloId}/difusion`, planes),

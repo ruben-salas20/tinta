@@ -109,7 +109,7 @@ export const catalogo = $state<{
 /** Sube cada vez que cambian las publicaciones, para quien las muestre. */
 export const difusion = $state({ version: 0 });
 
-export const canal = (id: string) => catalogo.canales.find((c) => c.id === id);
+export const canal = (id: string | null) => catalogo.canales.find((c) => c.id === id);
 
 export async function recargarCatalogo() {
   try {

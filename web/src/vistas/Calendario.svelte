@@ -15,18 +15,20 @@
     sumarMeses,
   } from '../lib/calendario';
   import { canal, catalogo, difusion, fallo, nav, recargarCatalogo } from '../lib/estado.svelte';
+  import { ordenarIdeas, resumenIdea, tituloDe } from '../lib/ideas';
   import Icono from '../componentes/Icono.svelte';
   import Lateral from '../componentes/Lateral.svelte';
   import DetallePublicacion from '../componentes/DetallePublicacion.svelte';
 
-  type Vista = 'mes' | 'semana' | 'lista';
+  type Vista = 'mes' | 'semana' | 'lista' | 'ideas';
   const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   const inicial = new URLSearchParams(nav.buscar);
-  let vista = $state<Vista>((['mes', 'semana', 'lista'] as const).find((v) => v === inicial.get('vista')) ?? 'mes');
+  let vista = $state<Vista>((['mes', 'semana', 'lista', 'ideas'] as const).find((v) => v === inicial.get('vista')) ?? 'mes');
   let fecha = $state(inicial.get('fecha') ?? '');
   let elegida = $state<string | null>(inicial.get('p'));
   let pubs = $state<Publicacion[]>([]);
+  let ideas = $state<Publicacion[]>([]);
   let arrastrando = $state<string | null>(null);
   let encima = $state<string | null>(null);
 
@@ -60,12 +62,14 @@
 
   async function cargar() {
     try {
-      pubs = await api.publicaciones({ ...rango, canal: filtroCanal ?? undefined });
+      if (vista === 'ideas') ideas = ordenarIdeas(await api.publicaciones({ sin_fecha: true, canal: filtroCanal ?? undefined }));
+      else pubs = await api.publicaciones({ ...rango, canal: filtroCanal ?? undefined });
     } catch (e) {
       fallo(e);
     }
   }
   $effect(() => {
+    void vista;
     void rango.desde;
     void rango.hasta;
     void filtroCanal;
@@ -75,22 +79,21 @@
 
   const porDia = $derived.by(() => {
     const m = new Map<string, Publicacion[]>();
-    for (const p of pubs) m.set(p.fecha, [...(m.get(p.fecha) ?? []), p]);
+    for (const p of pubs) if (p.fecha) m.set(p.fecha, [...(m.get(p.fecha) ?? []), p]);
     return m;
   });
 
   // Las filas de la semana: de la primera a la última hora con publicación.
   const horas = $derived(rangoHoras(pubs.map((p) => horaEntera(p.hora)).filter((h): h is number => h !== null)));
 
-  const titulo = $derived(vista === 'semana' ? nombreSemana(ref) : nombreMes(ref));
+  const titulo = $derived(vista === 'ideas' ? 'Ideas sin fecha' : vista === 'semana' ? nombreSemana(ref) : nombreMes(ref));
   const mesRef = $derived(ref.slice(0, 7));
 
   function mover(n: number) {
     fecha = vista === 'semana' ? sumarDias(ref, 7 * n) : sumarMeses(primeroDelMes(ref), n);
   }
 
-  const texto = (p: Publicacion) => p.titulo || p.partes[0]?.texto.slice(0, 80) || p.articulo?.titulo || 'Sin título';
-  const formato = (p: Publicacion) => canal(p.canal_id)?.formatos.find((f) => f.id === p.formato)?.nombre ?? p.formato;
+  const formato = (p: Publicacion) => canal(p.canal_id)?.formatos.find((f) => f.id === p.formato)?.nombre ?? p.formato ?? '';
 
   async function crear(dia: string) {
     const c = canal(filtroCanal ?? '') ?? catalogo.canales.find((c) => c.activo);
@@ -98,6 +101,17 @@
     try {
       const p = await api.crearPublicacion({ canal_id: c.id, formato: c.formatos[0].id, fecha: dia });
       pubs = [...pubs, p];
+      elegida = p.id;
+    } catch (e) {
+      fallo(e);
+    }
+  }
+
+  // Una idea nace sin fecha ni canal. Con un canal filtrado no se ve en la lista, pero sí se abre.
+  async function nuevaIdea() {
+    try {
+      const p = await api.crearPublicacion({ estado: 'idea' });
+      if (!filtroCanal) ideas = [p, ...ideas];
       elegida = p.id;
     } catch (e) {
       fallo(e);
@@ -122,13 +136,26 @@
     }
   }
 
+  // Si una publicación cambia de fecha o de canal, entra o sale de la vista que se ve.
+  function enVista(p: Publicacion): boolean {
+    if (filtroCanal && p.canal_id !== filtroCanal) return false;
+    if (vista === 'ideas') return p.fecha === null;
+    return p.fecha !== null && p.fecha >= rango.desde && p.fecha <= rango.hasta;
+  }
+
   function actualizada(p: Publicacion) {
-    const fuera = filtroCanal && p.canal_id !== filtroCanal;
-    pubs = fuera ? pubs.filter((x) => x.id !== p.id) : pubs.some((x) => x.id === p.id) ? pubs.map((x) => (x.id === p.id ? p : x)) : [...pubs, p];
+    const dentro = enVista(p);
+    const poner = (lista: Publicacion[]) => {
+      if (!lista.some((x) => x.id === p.id)) return dentro ? [...lista, p] : lista;
+      return dentro ? lista.map((x) => (x.id === p.id ? p : x)) : lista.filter((x) => x.id !== p.id);
+    };
+    if (vista === 'ideas') ideas = ordenarIdeas(poner(ideas));
+    else pubs = poner(pubs);
   }
 
   function borrada(id: string) {
     pubs = pubs.filter((p) => p.id !== id);
+    ideas = ideas.filter((p) => p.id !== id);
     elegida = null;
   }
 
@@ -144,14 +171,14 @@
     class="pub {p.estado}"
     class:sel={elegida === p.id}
     draggable="true"
-    title="{c?.nombre ?? p.canal_id} · {formato(p)} · {NOMBRE_ESTADO_PUB[p.estado]}"
+    title="{c?.nombre ?? 'Sin canal'} · {formato(p)} · {NOMBRE_ESTADO_PUB[p.estado]}"
     ondragstart={(e) => { arrastrando = p.id; e.dataTransfer?.setData('text/plain', p.id); }}
     ondragend={() => (arrastrando = encima = null)}
     onclick={(e) => abrir(e, p)}
   >
     <Icono n={c?.icono ?? 'x'} red />
     {#if conHora && p.hora}<span class="h">{p.hora}</span>{/if}
-    <span class="t">{texto(p)}</span>
+    <span class="t">{tituloDe(p)}</span>
   </button>
 {/snippet}
 
@@ -201,8 +228,8 @@
         ondragend={() => (arrastrando = encima = null)}
         onclick={(e) => abrir(e, p)}
       >
-        <span class="linea-pub" title="{c?.nombre} · {formato(p)}"><Icono n={c?.icono ?? 'x'} red />{#if p.hora}<span class="h">{p.hora}</span>{/if}</span>
-        <span class="t">{texto(p)}</span>
+        <span class="linea-pub" title="{c?.nombre ?? 'Sin canal'} · {formato(p)}"><Icono n={c?.icono ?? 'x'} red />{#if p.hora}<span class="h">{p.hora}</span>{/if}</span>
+        <span class="t">{tituloDe(p)}</span>
       </button>
     {/each}
   </div>
@@ -214,20 +241,27 @@
     <header class="cabecera">
       <h1>Calendario{#if filtroCanal}<span class="ruta"> · {canal(filtroCanal)?.nombre}</span>{/if}</h1>
       <div class="espacio"></div>
-      <button class="btn primario" onclick={() => crear(ref < catalogo.hoy ? catalogo.hoy : ref)}><Icono n="mas" />Nueva publicación</button>
+      {#if vista === 'ideas'}
+        <button class="btn primario" onclick={nuevaIdea}><Icono n="mas" />Nueva idea</button>
+      {:else}
+        <button class="btn primario" onclick={() => crear(ref < catalogo.hoy ? catalogo.hoy : ref)}><Icono n="mas" />Nueva publicación</button>
+      {/if}
     </header>
 
     <div class="cuerpo" class:con-detalle={!!elegida}>
       <div class="zona">
         <div class="barra">
-          <button class="btn" style="padding:0 7px" aria-label="Anterior" onclick={() => mover(-1)}><Icono n="izq" /></button>
-          <button class="btn" onclick={() => (fecha = '')}>Hoy</button>
-          <button class="btn" style="padding:0 7px" aria-label="Siguiente" onclick={() => mover(1)}><Icono n="der" /></button>
+          {#if vista !== 'ideas'}
+            <button class="btn" style="padding:0 7px" aria-label="Anterior" onclick={() => mover(-1)}><Icono n="izq" /></button>
+            <button class="btn" onclick={() => (fecha = '')}>Hoy</button>
+            <button class="btn" style="padding:0 7px" aria-label="Siguiente" onclick={() => mover(1)}><Icono n="der" /></button>
+          {/if}
           <h2>{titulo}</h2>
           <div class="pestanas" role="tablist">
             <button role="tab" class:sel={vista === 'mes'} onclick={() => (vista = 'mes')}>Mes</button>
             <button role="tab" class:sel={vista === 'semana'} onclick={() => (vista = 'semana')}>Semana</button>
             <button role="tab" class:sel={vista === 'lista'} onclick={() => (vista = 'lista')}>Lista</button>
+            <button role="tab" class:sel={vista === 'ideas'} onclick={() => (vista = 'ideas')}>Ideas</button>
           </div>
         </div>
 
@@ -249,6 +283,22 @@
               {#each dias as d (d)}{@render celda(d, h)}{/each}
             {/each}
           </div>
+        {:else if vista === 'ideas'}
+          {#if !ideas.length}
+            <div class="vacio-centro"><p>No hay ideas sin fecha.{filtroCanal ? '' : ' Crea una con «Nueva idea».'}</p></div>
+          {:else}
+            <div class="lista-ideas">
+              {#each ideas as p (p.id)}
+                {@const r = resumenIdea(p, catalogo.canales)}
+                <button class="pub {p.estado}" class:sel={elegida === p.id} onclick={(e) => abrir(e, p)}>
+                  <Icono n={canal(p.canal_id)?.icono ?? 'x'} red />
+                  <span class="t">{r.titulo}</span>
+                  <span class="formato">{r.canal}</span>
+                  <span class="chip punto e-{p.estado}">{r.estado}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
         {:else}
           {@const conPubs = [...porDia.keys()].sort()}
           {#if !conPubs.length}
@@ -264,8 +314,8 @@
                       <button class="pub {p.estado}" class:sel={elegida === p.id} onclick={(e) => abrir(e, p)}>
                         <Icono n={c?.icono ?? 'x'} red />
                         <span class="h">{p.hora ?? '—'}</span>
-                        <span class="t">{texto(p)}</span>
-                        <span class="formato">{c?.nombre} · {formato(p)}</span>
+                        <span class="t">{tituloDe(p)}</span>
+                        <span class="formato">{c ? `${c.nombre} · ${formato(p)}` : 'Sin canal'}</span>
                         <span class="chip punto e-{p.estado}">{NOMBRE_ESTADO_PUB[p.estado]}</span>
                       </button>
                     {/each}
@@ -278,7 +328,7 @@
 
         <div class="leyenda">
           {#each ESTADOS_PUB as e}<div class="pub {e}"><span class="t">{NOMBRE_ESTADO_PUB[e]}</span></div>{/each}
-          {#if vista !== 'lista'}<span>Arrastra una publicación a otro día para moverla. Clic en un hueco para crear una.</span>{/if}
+          {#if vista === 'mes' || vista === 'semana'}<span>Arrastra una publicación a otro día para moverla. Clic en un hueco para crear una.</span>{/if}
         </div>
       </div>
 

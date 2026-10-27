@@ -12,14 +12,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
-import dev.rubensalas.tinta.data.texto.Critic
+import dev.rubensalas.tinta.data.local.RangoAutoria
 import dev.rubensalas.tinta.data.texto.Edicion
+import dev.rubensalas.tinta.data.texto.Estilo
+import dev.rubensalas.tinta.data.texto.SIGNO_NOTA
 import dev.rubensalas.tinta.data.texto.Trozo
+import dev.rubensalas.tinta.data.texto.piezasLectura
+import dev.rubensalas.tinta.data.texto.tramosAutoria
 import dev.rubensalas.tinta.ui.tema.Colores
 import dev.rubensalas.tinta.ui.tema.Mono
-
-/** Marca de nota dentro del texto. La nota completa va en su tarjeta, bajo el bloque. */
-const val SIGNO_NOTA = " ✎"
 
 fun estiloTachado(c: Colores) = SpanStyle(color = c.tenue, textDecoration = TextDecoration.LineThrough)
 fun estiloAnadido(c: Colores) = SpanStyle(background = c.anadido, textDecoration = TextDecoration.Underline)
@@ -37,45 +38,36 @@ fun AnnotatedString.Builder.marca(t: Trozo, c: Colores) {
         }
         is Trozo.Nota -> withStyle(estiloNota(c)) { append(SIGNO_NOTA) }
         is Trozo.Resaltado -> withStyle(estiloAncla(c)) { append(t.texto) }
-        is Trozo.Texto -> enLinea(t.texto, c)
+        is Trozo.Texto -> append(t.texto)
     }
 }
 
-private val EN_LINEA = Regex("""\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[(.+?)]\((.+?)\)""")
-
-/** Negrita, cursiva, código y enlaces de Markdown, sin enseñar los asteriscos. */
-fun AnnotatedString.Builder.enLinea(s: String, c: Colores) {
-    var i = 0
-    for (m in EN_LINEA.findAll(s)) {
-        append(s.substring(i, m.range.first))
-        val (b, it, code, txt) = m.destructured
-        when {
-            b.isNotEmpty() -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(b) }
-            it.isNotEmpty() -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(it) }
-            code.isNotEmpty() -> withStyle(SpanStyle(fontFamily = Mono, background = c.gris, fontSize = 14.sp)) { append(code) }
-            else -> withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { append(txt) }
+/** El contenido de un bloque, listo para leer. Lo que viene de una propuesta del agente sale con un fondo suave. */
+fun textoBloque(tipo: String, contenido: String, c: Colores, autoria: List<RangoAutoria> = emptyList()): AnnotatedString {
+    val piezas = piezasLectura(tipo, contenido)
+    return buildAnnotatedString {
+        for (p in piezas) {
+            val estilo = estiloDe(p.estilo, c)
+            if (estilo == null) append(p.texto) else withStyle(estilo) { append(p.texto) }
         }
-        i = m.range.last + 1
+        for (t in tramosAutoria(piezas, autoria)) addStyle(estiloAutoria(c), t.first, t.last + 1)
     }
-    append(s.substring(i))
 }
 
-/** El contenido de un bloque, listo para leer. */
-fun textoBloque(tipo: String, contenido: String, c: Colores): AnnotatedString = buildAnnotatedString {
-    var cuerpo = contenido
-    if (tipo == "subtitulo") cuerpo = cuerpo.trimStart('#', ' ')
-    if (tipo == "cita") cuerpo = cuerpo.lines().joinToString("\n") { it.removePrefix(">").trimStart() }
-    if (tipo == "lista") cuerpo = cuerpo.lines().joinToString("\n") { l ->
-        val sangria = l.length - l.trimStart().length
-        val t = l.trimStart()
-        val sin = when {
-            t.startsWith("- ") || t.startsWith("* ") -> "• " + t.drop(2)
-            else -> t
-        }
-        " ".repeat(sangria) + sin
-    }
-    for (t in Critic.leer(cuerpo)) marca(t, c)
+private fun estiloDe(e: Estilo, c: Colores): SpanStyle? = when (e) {
+    Estilo.Normal -> null
+    Estilo.Negrita -> SpanStyle(fontWeight = FontWeight.SemiBold)
+    Estilo.Cursiva -> SpanStyle(fontStyle = FontStyle.Italic)
+    Estilo.Codigo -> SpanStyle(fontFamily = Mono, background = c.gris, fontSize = 14.sp)
+    Estilo.Enlace -> SpanStyle(textDecoration = TextDecoration.Underline)
+    Estilo.Tachado -> estiloTachado(c)
+    Estilo.Anadido -> estiloAnadido(c)
+    Estilo.Ancla -> estiloAncla(c)
+    Estilo.Nota -> estiloNota(c)
 }
+
+/** Fondo muy suave: se ve que el texto es del agente, sin llamar la atención. */
+fun estiloAutoria(c: Colores) = SpanStyle(background = c.violeta.copy(alpha = 0.12f))
 
 /**
  * Pinta el texto de una [Edicion]: cada marcador se ve como su marca. El cursor

@@ -84,7 +84,7 @@ interface DaoTinta {
         VarianteSeccionE::class, BloqueE::class, VarianteBloqueE::class, MedioE::class, CanalE::class,
         PublicacionE::class, OperacionE::class, MedioPendienteE::class, AvisoE::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Conversores::class)
@@ -99,8 +99,15 @@ abstract class BaseLocal : RoomDatabase() {
             }
         }
 
+        /** La versión 3 guarda qué partes de una variante vienen de una propuesta del agente aceptada. */
+        val MIGRACION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE variantes_bloque ADD COLUMN autoria TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
         fun crear(context: Context): BaseLocal =
-            Room.databaseBuilder(context, BaseLocal::class.java, "tinta.db").addMigrations(MIGRACION_1_2).build()
+            Room.databaseBuilder(context, BaseLocal::class.java, "tinta.db").addMigrations(MIGRACION_1_2, MIGRACION_2_3).build()
 
         fun enMemoria(context: Context): BaseLocal =
             Room.inMemoryDatabaseBuilder(context, BaseLocal::class.java).allowMainThreadQueries().build()

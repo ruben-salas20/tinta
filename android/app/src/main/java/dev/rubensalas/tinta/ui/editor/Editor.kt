@@ -217,6 +217,17 @@ fun PantallaEditor(
                         )
                         if (bloqueFoco != null) {
                             HorizontalDivider()
+                            val hermanos = doc.firstOrNull { sv -> sv.bloques.any { it.bloque.id == bloqueFoco.bloque.id } }?.bloques.orEmpty()
+                            val j = hermanos.indexOfFirst { it.bloque.id == bloqueFoco.bloque.id }
+                            if (bloqueFoco.bloque.tipo in TIPOS_TEXTO) DropdownMenuItem({ Text("Cambiar tipo") }, { menu = false; hoja = Hoja.CambiarTipo })
+                            if (j > 0) DropdownMenuItem({ Text("Subir bloque") }, {
+                                menu = false
+                                scope.launch { acciones.moverBloque(bloqueFoco.bloque.id, hermanos.getOrNull(j - 2)?.bloque?.id, hermanos[j - 1].bloque.id) }
+                            })
+                            if (j in 0 until hermanos.lastIndex) DropdownMenuItem({ Text("Bajar bloque") }, {
+                                menu = false
+                                scope.launch { acciones.moverBloque(bloqueFoco.bloque.id, hermanos[j + 1].bloque.id, hermanos.getOrNull(j + 2)?.bloque?.id) }
+                            })
                             DropdownMenuItem({ Text("Borrar este bloque") }, {
                                 menu = false
                                 val id = bloqueFoco.bloque.id
@@ -236,10 +247,18 @@ fun PantallaEditor(
                 val serie = datos.serie(a.serieId)?.let { "${it.nombre}${a.serieParte?.let { p -> " · parte $p" } ?: ""} · " }.orEmpty()
                 Text("$serie${NOMBRE_ESTADO[a.estado]}", Modifier.padding(top = 4.dp, bottom = 6.dp), style = Estilos.uiPeque, color = c.tenue)
                 Titulo(idioma.titulo) { t -> scope.launch { acciones.cambiarTitulo(idioma.id, t) } }
-                for (s in doc) {
-                    val titulo = s.activa?.titulo.orEmpty()
-                    if (titulo.isNotBlank()) Text(titulo, Modifier.padding(top = 18.dp, bottom = 8.dp), style = Estilos.subtitulo, color = c.texto)
-                    else Spacer(Modifier.height(8.dp))
+                for ((k, s) in doc.withIndex()) {
+                    CabeceraSeccion(s, primera = k == 0, ultima = k == doc.lastIndex, unica = doc.size == 1, conMenu = foco == null) { acc ->
+                        val id = s.seccion.id
+                        when (acc) {
+                            AccionSeccion.Titulo -> s.activa?.let { hoja = Hoja.TituloSeccion(it.id, it.titulo) }
+                            AccionSeccion.Nueva -> hoja = Hoja.NuevaSeccion(id)
+                            AccionSeccion.Subir -> scope.launch { acciones.moverSeccion(id, doc.getOrNull(k - 2)?.seccion?.id, doc[k - 1].seccion.id) }
+                            AccionSeccion.Bajar -> scope.launch { acciones.moverSeccion(id, doc[k + 1].seccion.id, doc.getOrNull(k + 2)?.seccion?.id) }
+                            AccionSeccion.Variantes -> hoja = Hoja.VariantesSeccion(id)
+                            AccionSeccion.Borrar -> hoja = Hoja.BorrarSeccion(id)
+                        }
+                    }
                     for (b in s.bloques) {
                         if (b.bloque.id != foco || b.activa == null) {
                             BloqueLectura(b, imagen) { enfocar(b.bloque.id) }
@@ -295,6 +314,14 @@ fun PantallaEditor(
                     ) {
                         Icon(Icons.Outlined.Add, null, Modifier.size(18.dp), tint = c.tenue)
                         Text("Añadir un párrafo", style = Estilos.cuerpo, color = c.tenue)
+                    }
+                    Row(
+                        Modifier.padding(top = 12.dp).clickable { hoja = Hoja.NuevaSeccion(doc.last().seccion.id) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Outlined.Add, null, Modifier.size(18.dp), tint = c.tenue)
+                        Text("Añadir una sección", style = Estilos.cuerpo, color = c.tenue)
                     }
                 }
             }
@@ -370,6 +397,44 @@ fun PantallaEditor(
                 },
                 onCerrar = { hoja = null },
             )
+            is Hoja.TituloSeccion -> DialogoNombre(
+                "Título de la sección", h.inicial, "Guardar", vacioVale = true,
+                onGuardar = { t -> scope.launch { acciones.cambiarTituloSeccion(h.vsId, t) }; hoja = null },
+                onCerrar = { hoja = null },
+            )
+            is Hoja.NuevaSeccion -> if (rama != null) DialogoNombre(
+                "Nueva sección", "", "Crear",
+                onGuardar = { t -> hoja = null; scope.launch { enfocar(acciones.nuevaSeccion(rama.id, h.despuesDe, t)) } },
+                onCerrar = { hoja = null },
+            )
+            is Hoja.VariantesSeccion -> doc.firstOrNull { it.seccion.id == h.seccionId }?.let { sv ->
+                HojaVariantesSeccion(
+                    datos, sv,
+                    onActivar = { v -> scope.launch { acciones.activarVarianteSeccion(sv.seccion.id, v.id) }; hoja = null },
+                    onDescartar = { v -> scope.launch { acciones.borrarVarianteSeccion(v.id) } },
+                    onNueva = { scope.launch { acciones.forkSeccion(sv.seccion.id, sv.activa?.id) }; hoja = null },
+                    onCerrar = { hoja = null },
+                )
+            }
+            is Hoja.BorrarSeccion -> DialogoBorrarSeccion(
+                onBorrar = { hoja = null; enfocar(null); scope.launch { acciones.borrarSeccion(h.seccionId) } },
+                onCerrar = { hoja = null },
+            )
+            Hoja.CambiarTipo -> if (bloqueFoco != null && activaFoco != null) HojaCambiarTipo(
+                actual = bloqueFoco.bloque.tipo,
+                onElegir = { tipo ->
+                    hoja = null
+                    val nuevo = conTipo(tipo, edicion.aMarkup())
+                    val bid = bloqueFoco.bloque.id
+                    val vid = activaFoco.id
+                    scope.launch {
+                        acciones.cambiarTipoBloque(bid, tipo)
+                        acciones.guardar(vid, nuevo)
+                        guardado = null
+                    }
+                },
+                onCerrar = { hoja = null },
+            )
             Hoja.Ramas -> HojaRamas(
                 datos = datos,
                 idioma = idioma,
@@ -399,6 +464,11 @@ sealed interface Hoja {
     data object Variantes : Hoja
     data object Historial : Hoja
     data object TipoBloque : Hoja
+    data object CambiarTipo : Hoja
+    data class TituloSeccion(val vsId: String, val inicial: String) : Hoja
+    data class NuevaSeccion(val despuesDe: String) : Hoja
+    data class VariantesSeccion(val seccionId: String) : Hoja
+    data class BorrarSeccion(val seccionId: String) : Hoja
     data object Youtube : Hoja
     data class Nota(val desde: Int, val hasta: Int) : Hoja
 }

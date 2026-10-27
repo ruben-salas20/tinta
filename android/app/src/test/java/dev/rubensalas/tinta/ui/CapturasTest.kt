@@ -35,6 +35,8 @@ import dev.rubensalas.tinta.ui.editor.HojaTipoBloque
 import dev.rubensalas.tinta.ui.editor.HojaIdiomas
 import dev.rubensalas.tinta.ui.editor.HojaRamas
 import dev.rubensalas.tinta.ui.editor.HojaVariantes
+import dev.rubensalas.tinta.ui.editor.HojaVariantesSeccion
+import dev.rubensalas.tinta.data.local.VarianteSeccionE
 import dev.rubensalas.tinta.ui.editor.VersionComparada
 import dev.rubensalas.tinta.ui.editor.PantallaConflicto
 import dev.rubensalas.tinta.ui.editor.PantallaEditor
@@ -129,6 +131,18 @@ class CapturasTest(private val oscuro: Boolean) {
         )
         Column(Modifier.padding(20.dp)) {
             for (id in listOf("b4", "b5")) BloqueLectura(e.documentoDeBloque(id)!!, { null }) {}
+        }
+    }
+
+    @Test fun secciones() = capturar("4e-secciones") {
+        val e = d.copy(
+            variantesSeccion = d.variantesSeccion + VarianteSeccionE("vs-b2", "s-b", "Lo que aprendí, más corto", creado = "2", rev = 1),
+            bloques = d.bloques + BloqueE("b9", "vs-b2", "V", "parrafo", "v9", 1),
+            variantesBloque = d.variantesBloque + VarianteBloqueE("v9", "b9", "Una sola idea: medir antes de comprar.", "tu", "2", "2", 1),
+        )
+        Box(Modifier.fillMaxSize()) {
+            PantallaEditor(e, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
+            HojaVariantesSeccion(e, e.documento("r-llama").first { it.seccion.id == "s-b" }, {}, {}, {}, {})
         }
     }
 

@@ -261,7 +261,7 @@ private fun FilaRama(
 }
 
 @Composable
-private fun DialogoNombre(titulo: String, inicial: String, boton: String, onGuardar: (String) -> Unit, onCerrar: () -> Unit) {
+fun DialogoNombre(titulo: String, inicial: String, boton: String, onGuardar: (String) -> Unit, onCerrar: () -> Unit, vacioVale: Boolean = false) {
     val c = Tinta.colores
     var texto by remember { mutableStateOf(inicial) }
     AlertDialog(
@@ -274,7 +274,7 @@ private fun DialogoNombre(titulo: String, inicial: String, boton: String, onGuar
                 textStyle = Estilos.ui.copy(color = c.texto), cursorBrush = SolidColor(c.texto), singleLine = true,
             )
         },
-        confirmButton = { TextButton({ onGuardar(texto.trim()) }, enabled = texto.isNotBlank()) { Text(boton) } },
+        confirmButton = { TextButton({ onGuardar(texto.trim()) }, enabled = vacioVale || texto.isNotBlank()) { Text(boton) } },
         dismissButton = { TextButton(onCerrar) { Text("Cancelar") } },
     )
 }

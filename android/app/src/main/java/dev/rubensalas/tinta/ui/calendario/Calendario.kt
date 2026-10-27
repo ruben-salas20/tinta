@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -46,12 +47,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -71,6 +76,7 @@ import dev.rubensalas.tinta.ui.comun.Tarjeta
 import dev.rubensalas.tinta.ui.comun.diaCorto
 import dev.rubensalas.tinta.ui.comun.fecha
 import dev.rubensalas.tinta.ui.comun.fechaCorta
+import dev.rubensalas.tinta.ui.comun.fechaLarga
 import dev.rubensalas.tinta.ui.comun.mezcla
 import dev.rubensalas.tinta.ui.editor.BotonPildora
 import dev.rubensalas.tinta.ui.tema.Estilos
@@ -81,12 +87,16 @@ import dev.rubensalas.tinta.ui.tema.estado
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-/** La agenda: lo atrasado arriba y después cada día con algo, de hoy en adelante. */
+/** La agenda: lo atrasado arriba y después cada día con algo, de hoy en adelante. «Mes» muestra una cuadrícula. */
 @Composable
-fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit, onNueva: () -> Unit) {
+fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit, onNueva: () -> Unit, vistaInicial: String = "semana") {
     val c = Tinta.colores
+    var vista by rememberSaveable { mutableStateOf(vistaInicial) }
     val d = hoy.toString()
     val atrasadas = datos.publicaciones.filter { it.fecha < d && it.estado != "publicada" }.sortedWith(Datos.ORDEN)
     val dias = datos.publicaciones.filter { it.fecha >= d }.sortedWith(Datos.ORDEN).groupBy { it.fecha }
@@ -95,26 +105,105 @@ fun PantallaCalendario(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> 
     Box(Modifier.fillMaxSize().background(c.papel)) {
         Column(Modifier.fillMaxSize()) {
             Cabecera("Calendario")
+            Row(Modifier.padding(horizontal = 16.dp).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip("Semana", lleno = vista == "semana", onClick = { vista = "semana" })
+                Chip("Mes", lleno = vista == "mes", onClick = { vista = "mes" })
+            }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 96.dp)) {
-                if (atrasadas.isNotEmpty()) {
-                    Grupo("Atrasadas")
-                    Tarjeta { Dia(null, atrasadas, datos, onPublicacion, conFecha = true) }
-                }
-                Grupo("Próximas")
-                if (dias.isEmpty()) Text("Nada planeado. Pulsa + para añadir una publicación.", style = Estilos.ui, color = c.secundario)
-                else Tarjeta {
-                    dias.entries.forEachIndexed { i, (f, ps) ->
-                        if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = c.linea)
-                        Dia(fecha(f), ps, datos, onPublicacion)
+                if (vista == "mes") Mes(datos, hoy, onPublicacion)
+                else {
+                    if (atrasadas.isNotEmpty()) {
+                        Grupo("Atrasadas")
+                        Tarjeta { Dia(null, atrasadas, datos, onPublicacion, conFecha = true) }
                     }
-                }
-                if (recientes.isNotEmpty()) {
-                    Grupo("Publicadas hace poco")
-                    Tarjeta { Dia(null, recientes, datos, onPublicacion, conFecha = true) }
+                    Grupo("Próximas")
+                    if (dias.isEmpty()) Text("Nada planeado. Pulsa + para añadir una publicación.", style = Estilos.ui, color = c.secundario)
+                    else Tarjeta {
+                        dias.entries.forEachIndexed { i, (f, ps) ->
+                            if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = c.linea)
+                            Dia(fecha(f), ps, datos, onPublicacion)
+                        }
+                    }
+                    if (recientes.isNotEmpty()) {
+                        Grupo("Publicadas hace poco")
+                        Tarjeta { Dia(null, recientes, datos, onPublicacion, conFecha = true) }
+                    }
                 }
             }
         }
         BotonCrear(Modifier.align(Alignment.BottomEnd).padding(18.dp), onClick = onNueva)
+    }
+}
+
+/** La cuadrícula del mes con la lista del día elegido debajo. Las semanas empiezan en lunes. */
+@Composable
+private fun Mes(datos: Datos, hoy: LocalDate, onPublicacion: (String) -> Unit) {
+    val c = Tinta.colores
+    var mes by rememberSaveable { mutableStateOf(YearMonth.from(hoy).toString()) }
+    var elegido by rememberSaveable { mutableStateOf<String?>(hoy.toString()) }
+    val actual = YearMonth.parse(mes)
+    val porDia = datos.publicaciones.sortedWith(Datos.ORDEN).groupBy { it.fecha }
+    val primero = actual.atDay(1)
+    val inicio = primero.minusDays(primero.dayOfWeek.value - 1L)
+    val titulo = actual.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es"))).replaceFirstChar { it.uppercase() }
+    fun ir(nuevo: YearMonth) { mes = nuevo.toString(); elegido = null }
+
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(CircleShape).clickable { ir(actual.minusMonths(1)) }, contentAlignment = Alignment.Center) {
+            Text("‹", style = Estilos.ui.copy(fontSize = 22.sp), color = c.texto)
+        }
+        Text(titulo, Modifier.weight(1f), textAlign = TextAlign.Center, style = Estilos.ui.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold), color = c.texto)
+        Box(Modifier.size(40.dp).clip(CircleShape).clickable { ir(actual.plusMonths(1)) }, contentAlignment = Alignment.Center) {
+            Text("›", style = Estilos.ui.copy(fontSize = 22.sp), color = c.texto)
+        }
+        Chip("Hoy", onClick = { mes = YearMonth.from(hoy).toString(); elegido = hoy.toString() })
+    }
+    Row(Modifier.fillMaxWidth()) {
+        for (letra in listOf("L", "M", "X", "J", "V", "S", "D")) Text(letra, Modifier.weight(1f), textAlign = TextAlign.Center, style = Estilos.uiPeque, color = c.tenue)
+    }
+    for (semana in 0 until 6) Row(Modifier.fillMaxWidth()) {
+        for (dia in 0 until 7) {
+            val d = inicio.plusDays(semana * 7L + dia)
+            val k = d.toString()
+            CeldaDia(
+                Modifier.weight(1f), d, enMes = YearMonth.from(d) == actual, esHoy = d == hoy, sel = k == elegido, ps = porDia[k].orEmpty(),
+                onClick = { elegido = k; mes = YearMonth.from(d).toString() },
+            )
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+    val ps = elegido?.let { porDia[it] }
+    val diaElegido = elegido?.let(::fecha)
+    when {
+        diaElegido == null -> Text("Toca un día para ver sus publicaciones.", Modifier.padding(top = 4.dp), style = Estilos.ui, color = c.secundario)
+        ps == null -> {
+            Grupo(fechaLarga(diaElegido))
+            Text("Nada planeado este día.", style = Estilos.ui, color = c.secundario)
+        }
+        else -> {
+            Grupo(fechaLarga(diaElegido))
+            Tarjeta { Dia(null, ps, datos, onPublicacion) }
+        }
+    }
+}
+
+@Composable
+private fun CeldaDia(modifier: Modifier, d: LocalDate, enMes: Boolean, esHoy: Boolean, sel: Boolean, ps: List<PublicacionE>, onClick: () -> Unit) {
+    val c = Tinta.colores
+    Column(
+        modifier.height(54.dp).padding(horizontal = 1.dp).alpha(if (enMes) 1f else 0.4f)
+            .clip(RoundedCornerShape(10.dp)).background(if (sel) c.gris else Color.Transparent).clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(Modifier.size(28.dp).clip(CircleShape).background(if (esHoy) c.tinta else Color.Transparent), contentAlignment = Alignment.Center) {
+            Text("${d.dayOfMonth}", style = Estilos.ui.copy(fontSize = 14.sp, fontWeight = if (esHoy || sel) FontWeight.SemiBold else FontWeight.Normal), color = if (esHoy) c.sobreTinta else c.texto)
+        }
+        Row(Modifier.padding(top = 3.dp).height(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            for (p in ps.take(3)) Box(Modifier.size(5.dp).clip(CircleShape).background(c.estado(p.estado)))
+            if (ps.size > 3) Text("+${ps.size - 3}", style = Estilos.uiPeque.copy(fontSize = 9.sp, lineHeight = 11.sp), color = c.secundario)
+        }
     }
 }
 

@@ -327,6 +327,8 @@ pub struct VarianteBloque {
     pub id: String,
     pub contenido: String,
     pub origen: String,
+    /// Solo en las «conflicto»: web, android o mcp. Nulo en las demás.
+    pub dispositivo: Option<String>,
     pub creado: String,
     pub cambiado: String,
     pub rev: i64,
@@ -388,7 +390,7 @@ pub fn documento(c: &Connection, rama_id: &str) -> Res<Documento> {
         "SELECT id, posicion, tipo, variante_activa_id FROM bloques WHERE variante_seccion_id = ?1 AND borrado = 0 ORDER BY posicion",
     )?;
     let mut q_vb = c.prepare(
-        "SELECT id, contenido, origen, creado, cambiado, rev FROM variantes_bloque WHERE bloque_id = ?1 AND borrado = 0 ORDER BY creado, rowid",
+        "SELECT id, contenido, origen, creado, cambiado, rev, dispositivo FROM variantes_bloque WHERE bloque_id = ?1 AND borrado = 0 ORDER BY creado, rowid",
     )?;
     for s in &mut secciones {
         s.variantes = q_vs
@@ -422,6 +424,7 @@ pub fn documento(c: &Connection, rama_id: &str) -> Res<Documento> {
                             id: r.get(0)?,
                             contenido: r.get(1)?,
                             origen: r.get(2)?,
+                            dispositivo: r.get(6)?,
                             creado: r.get(3)?,
                             cambiado: r.get(4)?,
                             rev: r.get(5)?,
@@ -1448,6 +1451,7 @@ pub fn guardar_variante_bloque(c: &mut Connection, id: &str, contenido: &str, re
     let aid = articulo_de(&tx, "variantes_bloque", id)?;
     if rev_actual != rev_base && actual != contenido {
         let nueva = insertar_variante_bloque(&tx, &bloque, contenido, "conflicto", rev)?;
+        tx.execute("UPDATE variantes_bloque SET dispositivo = ?2 WHERE id = ?1", params![nueva, dispositivo])?;
         tocar_articulo(&tx, &aid, rev)?;
         tx.commit()?;
         return Ok(Guardado { conflicto: true, variante: variante_bloque(c, &nueva)? });
@@ -1484,13 +1488,14 @@ pub fn guardar_variante_bloque(c: &mut Connection, id: &str, contenido: &str, re
 
 pub fn variante_bloque(c: &Connection, id: &str) -> Res<VarianteBloque> {
     c.query_row(
-        "SELECT id, contenido, origen, creado, cambiado, rev FROM variantes_bloque WHERE id = ?1",
+        "SELECT id, contenido, origen, creado, cambiado, rev, dispositivo FROM variantes_bloque WHERE id = ?1",
         params![id],
         |r| {
             Ok(VarianteBloque {
                 id: r.get(0)?,
                 contenido: r.get(1)?,
                 origen: r.get(2)?,
+                dispositivo: r.get(6)?,
                 creado: r.get(3)?,
                 cambiado: r.get(4)?,
                 rev: r.get(5)?,
@@ -1659,6 +1664,24 @@ mod pruebas {
         assert!(!guardar_variante_bloque(&mut c, &v.id, "hola", v.rev, "android").unwrap().conflicto);
         let a = listar_articulos(&c).unwrap();
         assert_eq!(a[0].senales.conflictos, 1);
+    }
+
+    #[test]
+    fn conflicto_guarda_dispositivo() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (_, v) = primer_bloque(&d);
+        guardar_variante_bloque(&mut c, &v.id, "hola", v.rev, "web").unwrap();
+        let g = guardar_variante_bloque(&mut c, &v.id, "hola desde el móvil", v.rev, "android").unwrap();
+        assert_eq!(g.variante.dispositivo.as_deref(), Some("android"));
+        // Llega también en el documento y en la sincronización, que son lo que leen los clientes.
+        let doc = documento(&c, &d.rama.id).unwrap();
+        let (b, _) = primer_bloque(&doc);
+        assert_eq!(b.variantes.iter().find(|x| x.origen == "conflicto").unwrap().dispositivo.as_deref(), Some("android"));
+        assert_eq!(b.variantes.iter().find(|x| x.id == v.id).unwrap().dispositivo, None);
+        let sync = crate::sync::bajar(&c, 0).unwrap();
+        let filas = sync["tablas"]["variantes_bloque"].as_array().unwrap();
+        assert!(filas.iter().any(|f| f["id"] == g.variante.id && f["dispositivo"] == "android"));
     }
 
     #[test]

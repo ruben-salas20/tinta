@@ -132,3 +132,11 @@ fun autor(origen: String): String = when {
     origen.startsWith("ia:") -> origen.removePrefix("ia:").replaceFirstChar { it.uppercase() }
     else -> origen
 }
+
+/** Nombre en pantalla de quien guardó una variante, según la cabecera X-Tinta-Dispositivo. Nulo si no se conoce. */
+fun dispositivo(id: String?): String? = when (id) {
+    "android" -> "Móvil"
+    "web" -> "Navegador"
+    "mcp" -> "Agente"
+    else -> null
+}

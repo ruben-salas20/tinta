@@ -296,7 +296,7 @@ fun PantallaEditor(
                             scope.launch { enfocar(acciones.nuevoBloque(vsFoco.id, bloqueFoco.bloque.id, "imagen", "![](medio:$id)")) }
                         }
                     },
-                    onBloque = { scope.launch { enfocar(acciones.nuevoBloque(vsFoco.id, bloqueFoco.bloque.id)) } },
+                    onBloque = { hoja = Hoja.TipoBloque },
                 )
             }
         }
@@ -306,6 +306,21 @@ fun PantallaEditor(
                 onActivar = { v -> scope.launch { acciones.activar(bloqueFoco.bloque.id, v.id) }; hoja = null },
                 onDescartar = { v -> scope.launch { acciones.descartarVariante(v.id) } },
                 onNueva = { scope.launch { acciones.fork(bloqueFoco.bloque.id, edicion.aMarkup()) }; hoja = null },
+                onCerrar = { hoja = null },
+            )
+            Hoja.TipoBloque -> if (bloqueFoco != null && vsFoco != null) HojaTipoBloque(
+                onElegir = { tipo, contenido ->
+                    hoja = null
+                    scope.launch { enfocar(acciones.nuevoBloque(vsFoco.id, bloqueFoco.bloque.id, tipo, contenido)) }
+                },
+                onVideo = { hoja = Hoja.Youtube },
+                onCerrar = { hoja = null },
+            )
+            Hoja.Youtube -> if (bloqueFoco != null && vsFoco != null) DialogoYoutube(
+                onGuardar = { url ->
+                    hoja = null
+                    scope.launch { enfocar(acciones.nuevoBloque(vsFoco.id, bloqueFoco.bloque.id, "youtube", url.trim())) }
+                },
                 onCerrar = { hoja = null },
             )
             Hoja.Historial -> if (activaFoco != null) HojaHistorial(
@@ -329,6 +344,8 @@ fun PantallaEditor(
 sealed interface Hoja {
     data object Variantes : Hoja
     data object Historial : Hoja
+    data object TipoBloque : Hoja
+    data object Youtube : Hoja
     data class Nota(val desde: Int, val hasta: Int) : Hoja
 }
 

@@ -144,9 +144,9 @@ pub struct ArticuloBreve {
 #[derive(Debug, Serialize)]
 pub struct Publicacion {
     pub id: String,
-    pub canal_id: String,
-    pub formato: String,
-    pub fecha: String,
+    pub canal_id: Option<String>,
+    pub formato: Option<String>,
+    pub fecha: Option<String>,
     pub hora: Option<String>,
     pub estado: String,
     pub titulo: String,
@@ -196,17 +196,22 @@ pub struct Filtro {
     pub hasta: Option<String>,
     pub canal: Option<String>,
     pub articulo: Option<String>,
+    /// `true` devuelve solo las ideas sin fecha, de la más reciente a la más antigua.
+    pub sin_fecha: Option<bool>,
 }
 
 pub fn listar_publicaciones(c: &Connection, f: &Filtro) -> Res<Vec<Publicacion>> {
+    // Con `sin_fecha`, el orden es por `cambiado`: no hay fecha que ordene.
+    let solo_sin_fecha = f.sin_fecha == Some(true);
     let sql = format!(
         "{SELECT} WHERE p.borrado = 0
          AND (?1 IS NULL OR p.fecha >= ?1) AND (?2 IS NULL OR p.fecha <= ?2)
          AND (?3 IS NULL OR p.canal_id = ?3) AND (?4 IS NULL OR p.articulo_id = ?4)
-         ORDER BY p.fecha, p.hora IS NULL, p.hora, p.creado"
+         AND (NOT ?5 OR p.fecha IS NULL)
+         ORDER BY CASE WHEN ?5 THEN p.cambiado END DESC, p.fecha IS NULL, p.fecha, p.hora IS NULL, p.hora, p.creado"
     );
     Ok(c.prepare(&sql)?
-        .query_map(params![f.desde, f.hasta, f.canal, f.articulo], leer_publicacion)?
+        .query_map(params![f.desde, f.hasta, f.canal, f.articulo, solo_sin_fecha], leer_publicacion)?
         .collect::<Result<_, _>>()?)
 }
 
@@ -226,32 +231,48 @@ fn validar_hora(h: &str) -> Res<()> {
     chrono::NaiveTime::parse_from_str(h, "%H:%M").map(|_| ()).map_err(|_| Error::Invalido(format!("hora no válida (HH:MM): {h}")))
 }
 
-fn validar(c: &Connection, canal_id: &str, formato: &str, estado: &str, partes: &[Parte]) -> Res<()> {
-    let canal = canal(c, canal_id)?;
-    let f = canal
-        .formatos
-        .iter()
-        .find(|f| f.id == formato)
-        .ok_or_else(|| Error::Invalido(format!("{} no tiene el formato «{formato}»", canal.nombre)))?;
+/// Sin canal no hay formato que validar. Sin fecha, la publicación es una idea
+/// (o está preparando). Programada y publicada necesitan fecha y canal.
+fn validar(c: &Connection, canal_id: Option<&str>, formato: Option<&str>, fecha: Option<&str>, estado: &str, partes: &[Parte]) -> Res<()> {
     if !ESTADOS.contains(&estado) {
         return Err(Error::Invalido(format!("estado desconocido: {estado}")));
     }
     if partes.is_empty() {
         return Err(Error::Invalido("una publicación necesita al menos una parte".into()));
     }
-    if !f.partes && partes.len() > 1 {
-        return Err(Error::Invalido(format!("un {} de {} tiene una sola parte", f.nombre.to_lowercase(), canal.nombre)));
+    match (canal_id, formato) {
+        (None, Some(_)) => return Err(Error::Incoherente("sin canal no puede haber formato".into())),
+        (Some(_), None) => return Err(Error::Invalido("falta el formato del canal".into())),
+        (Some(k), Some(formato)) => {
+            let canal = canal(c, k)?;
+            let f = canal
+                .formatos
+                .iter()
+                .find(|f| f.id == formato)
+                .ok_or_else(|| Error::Invalido(format!("{} no tiene el formato «{formato}»", canal.nombre)))?;
+            if !f.partes && partes.len() > 1 {
+                return Err(Error::Invalido(format!("un {} de {} tiene una sola parte", f.nombre.to_lowercase(), canal.nombre)));
+            }
+        }
+        (None, None) => {}
+    }
+    if fecha.is_none() && !matches!(estado, "idea" | "preparando") {
+        return Err(Error::Incoherente(format!("«{estado}» necesita fecha: sin fecha solo puede ser idea o preparando")));
+    }
+    if canal_id.is_none() && matches!(estado, "programada" | "publicada") {
+        return Err(Error::Incoherente(format!("«{estado}» necesita canal")));
     }
     Ok(())
 }
 
-/// La fecha de una publicación del portfolio es la del artículo.
+/// La fecha de una publicación del portfolio es la del artículo. Una sin
+/// fecha no toca la del artículo.
 fn sincronizar_fecha_articulo(c: &Connection, publicacion_id: &str, rev: i64) -> Res<()> {
     c.execute(
         "UPDATE articulos SET fecha = p.fecha, rev = ?2, cambiado = ?3
          FROM publicaciones p
          WHERE p.id = ?1 AND p.canal_id = ?4 AND p.borrado = 0 AND articulos.id = p.articulo_id
-           AND articulos.fecha IS NOT p.fecha",
+           AND p.fecha IS NOT NULL AND articulos.fecha IS NOT p.fecha",
         params![publicacion_id, rev, ahora(), PORTFOLIO],
     )?;
     Ok(())
@@ -259,9 +280,9 @@ fn sincronizar_fecha_articulo(c: &Connection, publicacion_id: &str, rev: i64) ->
 
 #[derive(Debug, Deserialize)]
 pub struct NuevaPublicacion {
-    pub canal_id: String,
-    pub formato: String,
-    pub fecha: String,
+    pub canal_id: Option<String>,
+    pub formato: Option<String>,
+    pub fecha: Option<String>,
     pub hora: Option<String>,
     #[serde(default = "idea")]
     pub estado: String,
@@ -289,9 +310,14 @@ pub fn crear_publicacion(c: &mut Connection, n: NuevaPublicacion) -> Res<Publica
 
 fn insertar(c: &Connection, n: NuevaPublicacion) -> Res<String> {
     let partes = n.partes.unwrap_or_else(|| vec![Parte { texto: String::new(), medios: vec![] }]);
-    validar(c, &n.canal_id, &n.formato, &n.estado, &partes)?;
-    validar_fecha(&n.fecha)?;
+    validar(c, n.canal_id.as_deref(), n.formato.as_deref(), n.fecha.as_deref(), &n.estado, &partes)?;
+    if let Some(f) = &n.fecha {
+        validar_fecha(f)?;
+    }
     if let Some(h) = &n.hora {
+        if n.fecha.is_none() {
+            return Err(Error::Incoherente("sin fecha no puede haber hora".into()));
+        }
         validar_hora(h)?;
     }
     if let Some(a) = &n.articulo_id
@@ -326,9 +352,12 @@ fn insertar(c: &Connection, n: NuevaPublicacion) -> Res<String> {
 
 #[derive(Debug, Deserialize, Default)]
 pub struct CambioPublicacion {
-    pub canal_id: Option<String>,
-    pub formato: Option<String>,
-    pub fecha: Option<String>,
+    #[serde(default, with = "doble")]
+    pub canal_id: Option<Option<String>>,
+    #[serde(default, with = "doble")]
+    pub formato: Option<Option<String>>,
+    #[serde(default, with = "doble")]
+    pub fecha: Option<Option<String>>,
     #[serde(default, with = "doble")]
     pub hora: Option<Option<String>>,
     pub estado: Option<String>,
@@ -357,13 +386,25 @@ pub fn actualizar_publicacion_como(c: &mut Connection, id: &str, cambio: CambioP
     let tx = c.transaction()?;
     let p = publicacion(&tx, id)?;
     let canal_id = cambio.canal_id.unwrap_or(p.canal_id);
-    let formato = cambio.formato.unwrap_or(p.formato);
+    // Sin canal, no hay formato: quitar el canal quita el formato.
+    let formato = match &canal_id {
+        None if matches!(cambio.formato, Some(Some(_))) => return Err(Error::Incoherente("sin canal no puede haber formato".into())),
+        None => None,
+        Some(_) => cambio.formato.unwrap_or(p.formato),
+    };
     let estado = cambio.estado.unwrap_or(p.estado);
     let partes = cambio.partes.unwrap_or(p.partes);
-    validar(&tx, &canal_id, &formato, &estado, &partes)?;
     let fecha = cambio.fecha.unwrap_or(p.fecha);
-    validar_fecha(&fecha)?;
-    let hora = cambio.hora.unwrap_or(p.hora);
+    validar(&tx, canal_id.as_deref(), formato.as_deref(), fecha.as_deref(), &estado, &partes)?;
+    if let Some(f) = &fecha {
+        validar_fecha(f)?;
+    }
+    // Sin fecha, no hay hora: quitar la fecha quita la hora.
+    let hora = match (&fecha, cambio.hora) {
+        (None, Some(Some(_))) => return Err(Error::Incoherente("sin fecha no puede haber hora".into())),
+        (None, _) => None,
+        (Some(_), h) => h.unwrap_or(p.hora),
+    };
     if let Some(h) = &hora {
         validar_hora(h)?;
     }
@@ -427,9 +468,9 @@ pub fn planear_difusion(c: &mut Connection, articulo_id: &str, planes: Vec<Plan>
         ids.push(insertar(
             &tx,
             NuevaPublicacion {
-                canal_id: p.canal_id,
-                formato: p.formato,
-                fecha: p.fecha,
+                canal_id: Some(p.canal_id),
+                formato: Some(p.formato),
+                fecha: Some(p.fecha),
                 hora: p.hora,
                 estado: "idea".into(),
                 titulo: titulo.clone(),
@@ -451,10 +492,11 @@ pub struct Proxima {
     pub hora: Option<String>,
 }
 
+/// Solo cuentan las que tienen canal: sin canal no hay a dónde ir.
 pub fn proxima(c: &Connection, articulo_id: &str, hoy: &str) -> Res<Option<Proxima>> {
     Ok(c.query_row(
         "SELECT canal_id, fecha, hora FROM publicaciones
-         WHERE articulo_id = ?1 AND borrado = 0 AND estado != 'publicada' AND fecha >= ?2
+         WHERE articulo_id = ?1 AND borrado = 0 AND estado != 'publicada' AND fecha >= ?2 AND canal_id IS NOT NULL
          ORDER BY fecha, hora IS NULL, hora LIMIT 1",
         params![articulo_id, hoy],
         |r| Ok(Proxima { canal_id: r.get(0)?, fecha: r.get(1)?, hora: r.get(2)? }),
@@ -470,9 +512,9 @@ mod pruebas {
 
     fn nueva(canal: &str, formato: &str, fecha: &str) -> NuevaPublicacion {
         NuevaPublicacion {
-            canal_id: canal.into(),
-            formato: formato.into(),
-            fecha: fecha.into(),
+            canal_id: Some(canal.into()),
+            formato: Some(formato.into()),
+            fecha: Some(fecha.into()),
             hora: None,
             estado: "idea".into(),
             titulo: String::new(),
@@ -511,14 +553,14 @@ mod pruebas {
         assert_eq!(p.partes, dos);
         assert_eq!(p.hora.as_deref(), Some("18:00"));
         // Un post no admite dos partes.
-        assert!(actualizar_publicacion(&mut c, &p.id, CambioPublicacion { formato: Some("post".into()), ..Default::default() }).is_err());
+        assert!(actualizar_publicacion(&mut c, &p.id, CambioPublicacion { formato: Some(Some("post".into())), ..Default::default() }).is_err());
         let p = actualizar_publicacion(
             &mut c,
             &p.id,
-            CambioPublicacion { fecha: Some("2026-11-03".into()), hora: Some(None), estado: Some("publicada".into()), enlace: Some(Some(" https://x.com/a/1 ".into())), ..Default::default() },
+            CambioPublicacion { fecha: Some(Some("2026-11-03".into())), hora: Some(None), estado: Some("publicada".into()), enlace: Some(Some(" https://x.com/a/1 ".into())), ..Default::default() },
         )
         .unwrap();
-        assert_eq!((p.fecha.as_str(), p.hora.is_none(), p.enlace.as_deref()), ("2026-11-03", true, Some("https://x.com/a/1")));
+        assert_eq!((p.fecha.as_deref(), p.hora.is_none(), p.enlace.as_deref()), (Some("2026-11-03"), true, Some("https://x.com/a/1")));
         let f = Filtro { desde: Some("2026-11-01".into()), hasta: Some("2026-11-30".into()), ..Default::default() };
         assert_eq!(listar_publicaciones(&c, &f).unwrap().len(), 1);
         borrar_publicacion(&mut c, &p.id).unwrap();
@@ -546,14 +588,104 @@ mod pruebas {
         assert_eq!(ps[1].articulo.as_ref().unwrap().titulo, "llama-swap");
         // La publicación del portfolio fija la fecha del artículo, y moverla la mueve.
         assert_eq!(modelo::articulo(&c, &a.id).unwrap().fecha.as_deref(), Some("2026-11-02"));
-        actualizar_publicacion(&mut c, &ps[0].id, CambioPublicacion { fecha: Some("2026-11-09".into()), ..Default::default() }).unwrap();
+        actualizar_publicacion(&mut c, &ps[0].id, CambioPublicacion { fecha: Some(Some("2026-11-09".into())), ..Default::default() }).unwrap();
         assert_eq!(modelo::articulo(&c, &a.id).unwrap().fecha.as_deref(), Some("2026-11-09"));
         // Mover la de X no la toca.
-        actualizar_publicacion(&mut c, &ps[1].id, CambioPublicacion { fecha: Some("2026-11-20".into()), ..Default::default() }).unwrap();
+        actualizar_publicacion(&mut c, &ps[1].id, CambioPublicacion { fecha: Some(Some("2026-11-20".into())), ..Default::default() }).unwrap();
         assert_eq!(modelo::articulo(&c, &a.id).unwrap().fecha.as_deref(), Some("2026-11-09"));
         let pr = proxima(&c, &a.id, "2026-11-05").unwrap().unwrap();
         assert_eq!((pr.canal_id.as_str(), pr.fecha.as_str()), ("portfolio", "2026-11-09"));
         assert!(proxima(&c, &a.id, "2026-12-01").unwrap().is_none());
+    }
+
+    fn idea_suelta() -> NuevaPublicacion {
+        NuevaPublicacion {
+            canal_id: None,
+            formato: None,
+            fecha: None,
+            hora: None,
+            estado: "idea".into(),
+            titulo: "Una idea sin dónde salir".into(),
+            partes: None,
+            articulo_id: None,
+            origen: "tu".into(),
+        }
+    }
+
+    #[test]
+    fn ideas_sin_fecha_ni_canal() {
+        let mut c = en_memoria();
+        let idea = crear_publicacion(&mut c, idea_suelta()).unwrap();
+        assert_eq!((idea.canal_id.is_none(), idea.formato.is_none(), idea.fecha.is_none()), (true, true, true));
+        // Sin canal, una idea admite cuantas partes quiera.
+        let tres: Vec<Parte> = (0..3).map(|i| Parte { texto: i.to_string(), medios: vec![] }).collect();
+        let idea = actualizar_publicacion(&mut c, &idea.id, CambioPublicacion { partes: Some(tres.clone()), ..Default::default() }).unwrap();
+        assert_eq!(idea.partes, tres);
+        // Sin fecha, solo caben idea y preparando.
+        let prog = NuevaPublicacion { estado: "programada".into(), ..idea_suelta() };
+        assert!(crear_publicacion(&mut c, prog).is_err());
+        let sin_canal = NuevaPublicacion { estado: "publicada".into(), fecha: Some("2026-11-02".into()), ..idea_suelta() };
+        assert!(crear_publicacion(&mut c, sin_canal).is_err());
+        // Un formato sin canal, o una hora sin fecha, no valen.
+        assert!(crear_publicacion(&mut c, NuevaPublicacion { formato: Some("post".into()), ..idea_suelta() }).is_err());
+        assert!(crear_publicacion(&mut c, NuevaPublicacion { hora: Some("18:00".into()), ..idea_suelta() }).is_err());
+        // «Sin fecha» devuelve solo las ideas sin fecha; desde y hasta no las devuelven.
+        let dada = crear_publicacion(&mut c, nueva("x", "post", "2026-11-02")).unwrap();
+        let sin_fecha = Filtro { sin_fecha: Some(true), ..Default::default() };
+        let ids: Vec<_> = listar_publicaciones(&c, &sin_fecha).unwrap().into_iter().map(|p| p.id).collect();
+        assert_eq!(ids, [idea.id.clone()]);
+        let rango = Filtro { desde: Some("2000-01-01".into()), hasta: Some("2100-01-01".into()), ..Default::default() };
+        let ids: Vec<_> = listar_publicaciones(&c, &rango).unwrap().into_iter().map(|p| p.id).collect();
+        assert_eq!(ids, [dada.id]);
+        // Ponerle fecha la lleva al calendario; quitársela la devuelve a la lista.
+        let idea = actualizar_publicacion(&mut c, &idea.id, CambioPublicacion { fecha: Some(Some("2026-11-05".into())), ..Default::default() }).unwrap();
+        assert_eq!(idea.fecha.as_deref(), Some("2026-11-05"));
+        assert!(listar_publicaciones(&c, &sin_fecha).unwrap().is_empty());
+        let idea = actualizar_publicacion(&mut c, &idea.id, CambioPublicacion { fecha: Some(None), ..Default::default() }).unwrap();
+        assert_eq!(listar_publicaciones(&c, &sin_fecha).unwrap().len(), 1);
+        assert!(idea.fecha.is_none());
+    }
+
+    #[test]
+    fn quitar_fecha_quita_hora_y_canal_quita_formato() {
+        let mut c = en_memoria();
+        let p = NuevaPublicacion { hora: Some("18:00".into()), ..nueva("x", "post", "2026-11-02") };
+        let p = crear_publicacion(&mut c, p).unwrap();
+        let p = actualizar_publicacion(&mut c, &p.id, CambioPublicacion { fecha: Some(None), ..Default::default() }).unwrap();
+        assert!(p.fecha.is_none() && p.hora.is_none());
+        assert!(actualizar_publicacion(&mut c, &p.id, CambioPublicacion { hora: Some(Some("09:00".into())), ..Default::default() }).is_err());
+        // Una programada no puede quedarse sin fecha.
+        let prog = NuevaPublicacion { estado: "programada".into(), ..nueva("x", "post", "2026-11-02") };
+        let prog = crear_publicacion(&mut c, prog).unwrap();
+        assert!(actualizar_publicacion(&mut c, &prog.id, CambioPublicacion { fecha: Some(None), ..Default::default() }).is_err());
+        // Quitar el canal quita el formato. Un canal sin formato no vale.
+        let p = actualizar_publicacion(&mut c, &p.id, CambioPublicacion { canal_id: Some(None), ..Default::default() }).unwrap();
+        assert!(p.canal_id.is_none() && p.formato.is_none());
+        assert!(actualizar_publicacion(&mut c, &p.id, CambioPublicacion { canal_id: Some(Some("x".into())), ..Default::default() }).is_err());
+        let p = actualizar_publicacion(
+            &mut c,
+            &p.id,
+            CambioPublicacion { canal_id: Some(Some("x".into())), formato: Some(Some("hilo".into())), ..Default::default() },
+        )
+        .unwrap();
+        assert_eq!(p.formato.as_deref(), Some("hilo"));
+    }
+
+    #[test]
+    fn portfolio_sin_fecha_no_toca_el_articulo() {
+        let mut c = en_memoria();
+        let a = modelo::crear_articulo(&mut c, "Sin fecha").unwrap();
+        let p = NuevaPublicacion {
+            canal_id: Some("portfolio".into()),
+            formato: Some("articulo".into()),
+            fecha: Some("2026-11-02".into()),
+            articulo_id: Some(a.id.clone()),
+            ..idea_suelta()
+        };
+        let p = crear_publicacion(&mut c, p).unwrap();
+        assert_eq!(modelo::articulo(&c, &a.id).unwrap().fecha.as_deref(), Some("2026-11-02"));
+        actualizar_publicacion(&mut c, &p.id, CambioPublicacion { fecha: Some(None), ..Default::default() }).unwrap();
+        assert_eq!(modelo::articulo(&c, &a.id).unwrap().fecha.as_deref(), Some("2026-11-02"));
     }
 
     #[test]

@@ -125,6 +125,20 @@ fun AppTinta(c: Contenedor) {
         alElegir = cb
         galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
+    // El audio no va por la galería: el selector del sistema muestra archivos de audio.
+    var alElegirAudio by remember { mutableStateOf<((String, String) -> Unit)?>(null) }
+    val selectorAudio = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val cb = alElegirAudio
+        alElegirAudio = null
+        if (uri != null && cb != null) scope.launch {
+            val medio = c.repositorio.guardarMedio(uri, "audio/mpeg", "audio")
+            cb(medio.id, medio.nombre)
+        }
+    }
+    fun elegirAudio(cb: (String, String) -> Unit) {
+        alElegirAudio = cb
+        selectorAudio.launch(arrayOf("audio/*"))
+    }
     val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     LaunchedEffect(Unit) {
         permiso.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -175,6 +189,7 @@ fun AppTinta(c: Contenedor) {
             override suspend fun historial(varianteId: String): List<EntradaHistorial> = repo.historial(varianteId)
             override suspend fun restaurar(varianteId: String, entrada: Long) = repo.restaurar(varianteId, entrada)
             override fun elegirImagen(onElegida: (String) -> Unit) = elegirImagen(onElegida)
+            override fun elegirAudio(onElegido: (String, String) -> Unit) = elegirAudio(onElegido)
             override suspend fun nuevaSeccion(ramaId: String, despuesDe: String?, titulo: String) = repo.nuevaSeccion(ramaId, despuesDe, titulo)
             override suspend fun cambiarTituloSeccion(vsId: String, titulo: String) = repo.cambiarTituloSeccion(vsId, titulo)
             override suspend fun borrarSeccion(id: String) = repo.borrarSeccion(id)

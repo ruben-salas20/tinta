@@ -56,6 +56,15 @@ import dev.rubensalas.tinta.ui.tema.Tinta
 private val IMAGEN = Regex("""!\[(.*?)]\(medio:([0-9a-f]{24})\)""")
 private val AUDIO = Regex("""<audio src="medio:([0-9a-f]{24})"(?: title="(.*?)")?""")
 
+/**
+ * El contenido de un bloque audio, igual que lo escribe la web: el título es el nombre
+ * sin extensión y las comillas se escapan. La exportación lo lee con este mismo formato.
+ */
+fun contenidoAudio(medioId: String, nombre: String): String {
+    val titulo = nombre.substringBeforeLast('.').replace("\"", "&quot;")
+    return """<audio src="medio:$medioId" title="$titulo" controls></audio>"""
+}
+
 fun estiloBloque(tipo: String, c: Colores): TextStyle = when (tipo) {
     "subtitulo" -> Estilos.subtitulo.copy(color = c.texto)
     "codigo" -> Estilos.codigo.copy(color = c.texto)

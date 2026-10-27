@@ -114,6 +114,7 @@ object Muestras {
         override suspend fun historial(varianteId: String) = emptyList<EntradaHistorial>()
         override suspend fun restaurar(varianteId: String, entrada: Long) = Unit
         override fun elegirImagen(onElegida: (String) -> Unit) = Unit
+        override fun elegirAudio(onElegido: (String, String) -> Unit) = Unit
         override suspend fun nuevaSeccion(ramaId: String, despuesDe: String?, titulo: String) = ""
         override suspend fun cambiarTituloSeccion(vsId: String, titulo: String) = Unit
         override suspend fun borrarSeccion(id: String) = Unit

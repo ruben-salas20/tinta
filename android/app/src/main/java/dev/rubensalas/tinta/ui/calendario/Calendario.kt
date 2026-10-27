@@ -29,7 +29,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.MusicNote
@@ -470,7 +470,7 @@ private fun EditorParte(
                     imagen(m)?.let { AsyncImage(it, null, Modifier.fillMaxSize()) }
                 } else {
                     Column(Modifier.fillMaxSize().padding(horizontal = 3.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                        Icon(if (medio?.tipo?.startsWith("audio/") == true) Icons.Outlined.MusicNote else Icons.Outlined.InsertDriveFile, null, Modifier.size(16.dp), tint = c.secundario)
+                        Icon(if (medio?.tipo?.startsWith("audio/") == true) Icons.Outlined.MusicNote else Icons.AutoMirrored.Outlined.InsertDriveFile, null, Modifier.size(16.dp), tint = c.secundario)
                         Text(medio?.nombre ?: "Medio", style = Estilos.uiPeque.copy(fontSize = 9.sp, lineHeight = 11.sp), color = c.secundario, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     }
                 }

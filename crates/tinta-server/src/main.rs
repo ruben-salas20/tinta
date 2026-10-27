@@ -1,6 +1,7 @@
 //! Tinta: calendario de contenido y escritura ordenada. Ver docs/plan.md.
 
 mod api;
+mod autoria;
 mod calendario;
 mod critic;
 mod db;

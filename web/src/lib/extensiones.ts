@@ -2,6 +2,7 @@ import { Extension, Mark, Node, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as PMNode } from '@tiptap/pm/model';
+import { piezasDeDoc, tramos, type Rango } from './autoria';
 
 const atributoIa = {
   ia: {
@@ -224,6 +225,41 @@ export const Tinta = Extension.create<OpcionesTinta>({
               .map((o) => Decoration.widget(o.hasta, () => botones(o, alResolver), { side: 1, key: `p${o.indice}-${o.hasta}` }));
             return DecorationSet.create(state.doc, decos);
           },
+        },
+      }),
+    ];
+  },
+});
+
+/**
+ * Marca el texto que viene de una propuesta del agente ya aceptada. Solo pinta:
+ * no cambia el documento ni el Markdown que se guarda. Al escribir, las marcas
+ * se mueven con el texto (mapeo de ProseMirror).
+ */
+export const claveAutoria = new PluginKey<DecorationSet>('autoria');
+
+export const AutoriaIa = Extension.create({
+  name: 'autoriaIa',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: claveAutoria,
+        state: {
+          init: () => DecorationSet.empty,
+          apply(tr, marcas: DecorationSet) {
+            // Lo manda BloqueTexto al poner un texto: sus rangos son del Markdown `raw`.
+            const meta = tr.getMeta(claveAutoria) as { raw: string; rangos: Rango[] } | undefined;
+            if (meta) {
+              const decos = tramos(meta.raw, piezasDeDoc(tr.doc), meta.rangos).map((t) =>
+                Decoration.inline(t.from, t.to, { class: 'escrito-ia', title: `Escrito por ${t.agente}` }),
+              );
+              return DecorationSet.create(tr.doc, decos);
+            }
+            return tr.docChanged ? marcas.map(tr.mapping, tr.doc) : marcas;
+          },
+        },
+        props: {
+          decorations: (state) => claveAutoria.getState(state),
         },
       }),
     ];

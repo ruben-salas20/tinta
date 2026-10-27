@@ -176,6 +176,19 @@ CREATE INDEX publicaciones_fecha ON publicaciones(fecha) WHERE borrado = 0;
 "#, r#"
 -- dispositivo: quién guardó una variante «conflicto» (web, android o mcp). Nulo en las demás.
 ALTER TABLE variantes_bloque ADD COLUMN dispositivo TEXT;
+"#, r#"
+-- Texto de una variante que viene de una propuesta del agente aceptada.
+-- desde y hasta: caracteres (no bytes) en el contenido crudo, con sus marcas.
+-- No tiene rev: viaja dentro de su variante (campo autoria) y cambia con ella.
+CREATE TABLE autoria_ia (
+  id INTEGER PRIMARY KEY,
+  variante_bloque_id TEXT NOT NULL REFERENCES variantes_bloque(id),
+  desde INTEGER NOT NULL,
+  hasta INTEGER NOT NULL,
+  agente TEXT NOT NULL,
+  creado TEXT NOT NULL
+);
+CREATE INDEX autoria_ia_variante ON autoria_ia(variante_bloque_id);
 "#];
 
 pub fn abrir(ruta: &Path) -> rusqlite::Result<Connection> {

@@ -1,6 +1,7 @@
 //! Operaciones sobre los datos. Las usa la API web y, más adelante, el MCP y
 //! la sincronización del móvil: toda la lógica vive aquí, no en las rutas.
 
+use crate::autoria::{self, Rango};
 use crate::critic;
 use crate::db::{existe, siguiente_rev};
 use crate::posicion;
@@ -332,6 +333,8 @@ pub struct VarianteBloque {
     pub creado: String,
     pub cambiado: String,
     pub rev: i64,
+    /// Partes del contenido que vienen de propuestas del agente ya aceptadas.
+    pub autoria: Vec<Rango>,
 }
 
 #[derive(Debug, Serialize)]
@@ -428,9 +431,13 @@ pub fn documento(c: &Connection, rama_id: &str) -> Res<Documento> {
                             creado: r.get(3)?,
                             cambiado: r.get(4)?,
                             rev: r.get(5)?,
+                            autoria: vec![],
                         })
                     })?
                     .collect::<Result<_, _>>()?;
+                for v in &mut b.variantes {
+                    v.autoria = autoria_de(c, &v.id)?;
+                }
             }
         }
     }
@@ -940,7 +947,10 @@ fn copiar_rama(c: &Connection, origen: &str, idioma_id: &str, nombre: &str, rev:
 fn copiar_bloques(c: &Connection, vs: &VarianteSeccion, destino: &str, rev: i64) -> Res<()> {
     for b in &vs.bloques {
         if let Some(vb) = b.variantes.iter().find(|v| Some(&v.id) == b.variante_activa_id.as_ref()) {
-            insertar_bloque_con(c, derivado(&b.id), derivado(&vb.id), destino, &b.posicion, &b.tipo, &vb.contenido, "tu", rev)?;
+            let vid = derivado(&vb.id);
+            insertar_bloque_con(c, derivado(&b.id), vid.clone(), destino, &b.posicion, &b.tipo, &vb.contenido, "tu", rev)?;
+            // Copia tal cual: los rangos de autoría viajan con el texto.
+            guardar_autoria(c, &vid, &vb.autoria)?;
         }
     }
     Ok(())
@@ -1405,16 +1415,25 @@ pub struct ForkBloque {
 pub fn fork_bloque(c: &mut Connection, bloque_id: &str, f: ForkBloque) -> Res<(Documento, String)> {
     let tx = c.transaction()?;
     let rama = rama_de(&tx, "bloques", bloque_id)?;
+    // La activa es la fuente: de ella salen los rangos y, si no se da texto, el texto.
+    let fuente: Option<(String, String)> = tx
+        .query_row(
+            "SELECT vb.id, vb.contenido FROM bloques b JOIN variantes_bloque vb ON vb.id = b.variante_activa_id WHERE b.id = ?1",
+            params![bloque_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
     let contenido = match f.contenido {
         Some(t) => t,
-        None => tx.query_row(
-            "SELECT vb.contenido FROM bloques b JOIN variantes_bloque vb ON vb.id = b.variante_activa_id WHERE b.id = ?1",
-            params![bloque_id],
-            |r| r.get(0),
-        )?,
+        None => fuente.as_ref().map(|(_, t)| t.clone()).ok_or(Error::NoExiste("variante de bloque"))?,
     };
     let rev = siguiente_rev(&tx)?;
     let nueva = insertar_variante_bloque(&tx, bloque_id, &contenido, &f.origen, rev)?;
+    if let Some((fuente_id, fuente_txt)) = &fuente {
+        // Si el texto es el mismo, los rangos se copian tal cual; si cambió, se desplazan como en una edición.
+        let rangos = autoria::desplazar(&autoria_de(&tx, fuente_id)?, fuente_txt, &contenido);
+        guardar_autoria(&tx, &nueva, &rangos)?;
+    }
     if f.activar {
         tx.execute("UPDATE bloques SET variante_activa_id = ?2, rev = ?3 WHERE id = ?1", params![bloque_id, nueva, rev])?;
     }
@@ -1438,6 +1457,19 @@ pub struct Guardado {
 const SESION_HISTORIAL_MIN: i64 = 10;
 
 pub fn guardar_variante_bloque(c: &mut Connection, id: &str, contenido: &str, rev_base: i64, dispositivo: &str) -> Res<Guardado> {
+    guardar_con_aceptada(c, id, contenido, rev_base, dispositivo, None)
+}
+
+/// Como [`guardar_variante_bloque`]. `aceptada` es el rango de la propuesta
+/// del agente que acaba de aceptarse, en las coordenadas de `contenido`.
+fn guardar_con_aceptada(
+    c: &mut Connection,
+    id: &str,
+    contenido: &str,
+    rev_base: i64,
+    dispositivo: &str,
+    aceptada: Option<Rango>,
+) -> Res<Guardado> {
     let tx = c.transaction()?;
     let (bloque, actual, origen, rev_actual): (String, String, String, i64) = tx
         .query_row(
@@ -1480,30 +1512,60 @@ pub fn guardar_variante_bloque(c: &mut Connection, id: &str, contenido: &str, re
             "UPDATE variantes_bloque SET contenido = ?2, origen = 'tu', cambiado = ?3, rev = ?4 WHERE id = ?1",
             params![id, contenido, ahora(), rev],
         )?;
+        // Los rangos siguen al texto. Lo recién aceptado se añade después, ya en el texto nuevo.
+        let mut rangos = autoria::desplazar(&autoria_de(&tx, id)?, &actual, contenido);
+        rangos.extend(aceptada);
+        guardar_autoria(&tx, id, &rangos)?;
         tocar_articulo(&tx, &aid, rev)?;
     }
     tx.commit()?;
     Ok(Guardado { conflicto: false, variante: variante_bloque(c, id)? })
 }
 
+/// Los rangos de autoría de una variante, por posición.
+pub fn autoria_de(c: &Connection, variante_id: &str) -> Res<Vec<Rango>> {
+    Ok(c.prepare("SELECT desde, hasta, agente FROM autoria_ia WHERE variante_bloque_id = ?1 ORDER BY desde")?
+        .query_map(params![variante_id], |r| {
+            Ok(Rango { desde: r.get::<_, i64>(0)? as usize, hasta: r.get::<_, i64>(1)? as usize, agente: r.get(2)? })
+        })?
+        .collect::<Result<_, _>>()?)
+}
+
+/// Cambia los rangos de una variante por estos.
+fn guardar_autoria(c: &Connection, variante_id: &str, rangos: &[Rango]) -> Res<()> {
+    c.execute("DELETE FROM autoria_ia WHERE variante_bloque_id = ?1", params![variante_id])?;
+    let t = ahora();
+    for r in rangos {
+        c.execute(
+            "INSERT INTO autoria_ia (variante_bloque_id, desde, hasta, agente, creado) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![variante_id, r.desde as i64, r.hasta as i64, r.agente, t],
+        )?;
+    }
+    Ok(())
+}
+
 pub fn variante_bloque(c: &Connection, id: &str) -> Res<VarianteBloque> {
-    c.query_row(
-        "SELECT id, contenido, origen, creado, cambiado, rev, dispositivo FROM variantes_bloque WHERE id = ?1",
-        params![id],
-        |r| {
-            Ok(VarianteBloque {
-                id: r.get(0)?,
-                contenido: r.get(1)?,
-                origen: r.get(2)?,
-                dispositivo: r.get(6)?,
-                creado: r.get(3)?,
-                cambiado: r.get(4)?,
-                rev: r.get(5)?,
-            })
-        },
-    )
-    .optional()?
-    .ok_or(Error::NoExiste("variante de bloque"))
+    let mut v = c
+        .query_row(
+            "SELECT id, contenido, origen, creado, cambiado, rev, dispositivo FROM variantes_bloque WHERE id = ?1",
+            params![id],
+            |r| {
+                Ok(VarianteBloque {
+                    id: r.get(0)?,
+                    contenido: r.get(1)?,
+                    origen: r.get(2)?,
+                    dispositivo: r.get(6)?,
+                    creado: r.get(3)?,
+                    cambiado: r.get(4)?,
+                    rev: r.get(5)?,
+                    autoria: vec![],
+                })
+            },
+        )
+        .optional()?
+        .ok_or(Error::NoExiste("variante de bloque"))?;
+    v.autoria = autoria_de(c, id)?;
+    Ok(v)
 }
 
 pub fn borrar_variante_bloque(c: &mut Connection, id: &str) -> Res<Documento> {
@@ -1573,8 +1635,8 @@ pub fn restaurar(c: &mut Connection, variante_id: &str, entrada: i64, dispositiv
 
 pub fn resolver_marca(c: &mut Connection, variante_id: &str, indice: usize, d: critic::Decision, dispositivo: &str) -> Res<Guardado> {
     let v = variante_bloque(c, variante_id)?;
-    let nuevo = critic::resolver(&v.contenido, indice, d).ok_or(Error::NoExiste("marca"))?;
-    guardar_variante_bloque(c, variante_id, &nuevo, v.rev, dispositivo)
+    let (nuevo, aceptada) = critic::resolver_con_origen(&v.contenido, indice, d).ok_or(Error::NoExiste("marca"))?;
+    guardar_con_aceptada(c, variante_id, &nuevo, v.rev, dispositivo, aceptada)
 }
 
 // ----------------------------------------------------------------- Medios
@@ -1817,6 +1879,96 @@ mod pruebas {
         guardar_variante_bloque(&mut c, &v.id, "El {~~ttl dice~>campo ttl marca~~}{>>ia:claude<<} algo", v.rev, "web").unwrap();
         let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
         assert_eq!(g.variante.contenido, "El campo ttl marca algo");
+    }
+
+    fn rango(desde: usize, hasta: usize) -> Rango {
+        Rango { desde, hasta, agente: "claude".into() }
+    }
+
+    #[test]
+    fn aceptar_propuesta_guarda_su_rango_en_caracteres() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (b, v) = primer_bloque(&d);
+        let bid = b.id.clone();
+        guardar_variante_bloque(&mut c, &v.id, "Qué 🚀 {++ñandú 🙂++}{>>ia:claude<<} fin", v.rev, "web").unwrap();
+        let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
+        assert_eq!(g.variante.contenido, "Qué 🚀 ñandú 🙂 fin");
+        assert_eq!(g.variante.autoria, vec![rango(6, 13)]);
+        // Sale también en el documento que lee la web.
+        let d2 = documento(&c, &d.rama.id).unwrap();
+        assert_eq!(d2.secciones[0].variantes[0].bloques.iter().find(|x| x.id == bid).unwrap().variantes[0].autoria, vec![rango(6, 13)]);
+    }
+
+    #[test]
+    fn aceptar_cambio_guarda_el_texto_nuevo() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (_, v) = primer_bloque(&d);
+        guardar_variante_bloque(&mut c, &v.id, "Hola {~~mundo~>mar~~}{>>ia:claude<<} y", v.rev, "web").unwrap();
+        let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
+        assert_eq!(g.variante.contenido, "Hola mar y");
+        assert_eq!(g.variante.autoria, vec![rango(5, 8)]);
+    }
+
+    #[test]
+    fn aceptar_borrado_o_rechazar_no_guarda_nada() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (_, v) = primer_bloque(&d);
+        guardar_variante_bloque(&mut c, &v.id, "Hola {--x--}{>>ia:claude<<} {++y++}{>>ia:claude<<}", v.rev, "web").unwrap();
+        let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
+        assert!(g.variante.autoria.is_empty());
+        // Ahora la marca 0 es el añadido: rechazarlo tampoco deja rango.
+        let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Rechazar, "web").unwrap();
+        assert!(g.variante.autoria.is_empty());
+        assert_eq!(g.variante.contenido, "Hola  ");
+    }
+
+    #[test]
+    fn editar_desplaza_o_recorta_el_rango() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (_, v) = primer_bloque(&d);
+        guardar_variante_bloque(&mut c, &v.id, "Qué 🚀 {++ñandú 🙂++}{>>ia:claude<<} fin", v.rev, "web").unwrap();
+        let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
+        let id = g.variante.id.clone();
+        // Escribir antes del rango lo desplaza.
+        let g = guardar_variante_bloque(&mut c, &id, "¡Qué 🚀 ñandú 🙂 fin", g.variante.rev, "web").unwrap();
+        assert_eq!(g.variante.autoria, vec![rango(7, 14)]);
+        // Escribir después no lo toca.
+        let g = guardar_variante_bloque(&mut c, &id, "¡Qué 🚀 ñandú 🙂 fin más", g.variante.rev, "web").unwrap();
+        assert_eq!(g.variante.autoria, vec![rango(7, 14)]);
+        // Escribir encima lo recorta: «ñandú 🙂» desaparece del todo.
+        let g = guardar_variante_bloque(&mut c, &id, "¡Qué 🚀 xyz fin más", g.variante.rev, "web").unwrap();
+        assert!(g.variante.autoria.is_empty());
+    }
+
+    #[test]
+    fn copiar_bloque_copia_sus_rangos() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (b, v) = primer_bloque(&d);
+        let bid = b.id.clone();
+        guardar_variante_bloque(&mut c, &v.id, "Hola {++mundo++}{>>ia:claude<<}", v.rev, "web").unwrap();
+        let g = resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
+        // Copia tal cual: el mismo texto, los mismos rangos.
+        let (_, nueva) = fork_bloque(&mut c, &bid, ForkBloque { contenido: None, activar: false, origen: "tu".into() }).unwrap();
+        assert_eq!(variante_bloque(&c, &nueva).unwrap().autoria, g.variante.autoria);
+        // Con otro texto, los rangos se desplazan como en una edición: «mundo» sigue intacto.
+        let (_, otra) = fork_bloque(&mut c, &bid, ForkBloque { contenido: Some("Adiós mundo".into()), activar: false, origen: "tu".into() }).unwrap();
+        assert_eq!(variante_bloque(&c, &otra).unwrap().autoria, vec![rango(6, 11)]);
+    }
+
+    #[test]
+    fn copiar_rama_copia_sus_rangos() {
+        let mut c = en_memoria();
+        let (_, d) = nuevo(&mut c);
+        let (_, v) = primer_bloque(&d);
+        guardar_variante_bloque(&mut c, &v.id, "Hola {++mundo++}{>>ia:claude<<}", v.rev, "web").unwrap();
+        resolver_marca(&mut c, &v.id, 0, critic::Decision::Aceptar, "web").unwrap();
+        let f = fork_rama(&mut c, &d.rama.id, "copia").unwrap();
+        assert_eq!(f.secciones[0].variantes[0].bloques[0].variantes[0].autoria, vec![rango(5, 10)]);
     }
 
     #[test]

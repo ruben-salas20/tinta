@@ -69,6 +69,14 @@ pub fn bajar(c: &Connection, desde: i64) -> Res<Value> {
             .collect::<Result<_, _>>()?;
         tablas.insert(t.into(), Value::Array(filas));
     }
+    // Los rangos de autoría no tienen tabla propia en el móvil: van dentro de
+    // su variante, que cambia con ellos (su rev sube al cambiar el texto).
+    if let Some(Value::Array(vbs)) = tablas.get_mut("variantes_bloque") {
+        for v in vbs {
+            let id = v["id"].as_str().unwrap_or_default().to_string();
+            v["autoria"] = json!(modelo::autoria_de(c, &id)?);
+        }
+    }
     // Las etiquetas de cada artículo no tienen rev propia: cambiarlas sube la
     // del artículo, así que van dentro de su fila.
     if let Some(Value::Array(arts)) = tablas.get_mut("articulos") {
@@ -342,6 +350,20 @@ mod pruebas {
         modelo::borrar_articulo(&mut c, &a.id).unwrap();
         let tras = bajar(&c, nuevo["rev"].as_i64().unwrap()).unwrap();
         assert_eq!(tras["tablas"]["articulos"][0]["borrado"], 1);
+    }
+
+    #[test]
+    fn bajar_lleva_la_autoria_de_cada_variante() {
+        let mut c = en_memoria();
+        let a = modelo::crear_articulo(&mut c, "A").unwrap();
+        let d = modelo::documento(&c, a.idiomas[0].resumen.rama_principal_id.as_ref().unwrap()).unwrap();
+        let v = d.secciones[0].variantes[0].bloques[0].variantes[0].clone();
+        modelo::guardar_variante_bloque(&mut c, &v.id, "Hola {++mundo++}{>>ia:claude<<}", v.rev, "web").unwrap();
+        modelo::resolver_marca(&mut c, &v.id, 0, crate::critic::Decision::Aceptar, "web").unwrap();
+        let r = bajar(&c, -1).unwrap();
+        let fila = &r["tablas"]["variantes_bloque"][0];
+        assert_eq!(fila["contenido"], "Hola mundo");
+        assert_eq!(fila["autoria"], json!([{ "desde": 5, "hasta": 10, "agente": "claude" }]));
     }
 
     #[test]

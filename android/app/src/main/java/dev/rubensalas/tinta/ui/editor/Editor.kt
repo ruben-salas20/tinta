@@ -81,6 +81,8 @@ interface AccionesEditor {
     suspend fun restaurar(varianteId: String, entrada: Long)
     /** Abre la galería; [onElegida] recibe el id del medio ya guardado en el móvil. */
     fun elegirImagen(onElegida: (String) -> Unit)
+    /** Abre el selector de audio; [onElegido] recibe el id del medio y su nombre de archivo. */
+    fun elegirAudio(onElegido: (id: String, nombre: String) -> Unit)
 
     // Secciones y bloques
     /** Devuelve el id del párrafo vacío con el que nace. */
@@ -375,6 +377,12 @@ fun PantallaEditor(
                     scope.launch { enfocar(acciones.nuevoBloque(vsFoco.id, bloqueFoco.bloque.id, tipo, contenido)) }
                 },
                 onVideo = { hoja = Hoja.Youtube },
+                onAudio = {
+                    hoja = null
+                    acciones.elegirAudio { id, nombre ->
+                        scope.launch { enfocar(acciones.nuevoBloque(vsFoco.id, bloqueFoco.bloque.id, "audio", contenidoAudio(id, nombre))) }
+                    }
+                },
                 onCerrar = { hoja = null },
             )
             Hoja.Youtube -> if (bloqueFoco != null && vsFoco != null) DialogoYoutube(

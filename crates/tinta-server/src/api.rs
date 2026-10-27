@@ -391,7 +391,7 @@ async fn borrar_serie(State(e): State<Estado>, Path(id): Path<String>) -> R<Stat
 /// Tipos que se aceptan: lo que el portfolio sabe mostrar.
 fn tipo_permitido(t: &str) -> bool {
     matches!(t, "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "image/svg+xml" | "image/avif")
-        || matches!(t, "audio/mpeg" | "audio/mp4" | "audio/ogg" | "audio/wav" | "audio/x-wav" | "audio/webm" | "audio/aac")
+        || matches!(t, "audio/mpeg" | "audio/mp4" | "audio/ogg" | "audio/wav" | "audio/x-wav" | "audio/webm" | "audio/aac" | "audio/flac" | "audio/x-m4a")
 }
 
 async fn subir_medio(State(e): State<Estado>, mut m: Multipart) -> R<(StatusCode, Json<modelo::Medio>)> {
@@ -697,6 +697,15 @@ mod pruebas {
         assert_eq!(res.headers()["content-type"], "audio/mpeg");
         assert!(res.headers()["cache-control"].to_str().unwrap().contains("immutable"));
         assert_eq!(res.into_body().collect().await.unwrap().to_bytes().as_ref(), b"234");
+    }
+
+    #[test]
+    fn admite_los_audios_que_manda_el_movil() {
+        for t in ["audio/mpeg", "audio/mp4", "audio/ogg", "audio/x-wav", "audio/flac", "audio/x-m4a"] {
+            assert!(tipo_permitido(t), "{t} debería admitirse");
+        }
+        assert!(!tipo_permitido("application/octet-stream"));
+        assert!(!tipo_permitido("text/plain"));
     }
 
     #[tokio::test]

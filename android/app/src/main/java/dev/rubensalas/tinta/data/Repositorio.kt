@@ -230,20 +230,24 @@ class Repositorio(
     }
 
     /** Copia una imagen de la galería a la app y la deja lista para subir. Devuelve su id. */
-    suspend fun guardarImagen(uri: Uri): String {
+    suspend fun guardarImagen(uri: Uri): String = guardarMedio(uri, "image/jpeg", "imagen.jpg").id
+
+    /** Copia un archivo elegido (imagen, audio…) a la app y lo deja listo para subir. */
+    suspend fun guardarMedio(uri: Uri, tipoPorDefecto: String, nombrePorDefecto: String): MedioE {
         val id = nuevoId()
         val cr = context.contentResolver
-        val tipo = cr.getType(uri) ?: "image/jpeg"
+        val tipo = cr.getType(uri) ?: tipoPorDefecto
         val nombre = cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0) else null
-        } ?: "imagen.jpg"
+        } ?: nombrePorDefecto
         val dir = File(context.filesDir, "medios").apply { mkdirs() }
         val f = File(dir, id)
         cr.openInputStream(uri)!!.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
-        dao.medios(listOf(MedioE(id, "", nombre, tipo, f.length(), Instant.now().toString(), rev = -1)))
+        val medio = MedioE(id, "", nombre, tipo, f.length(), Instant.now().toString(), rev = -1)
+        dao.medios(listOf(medio))
         dao.medioPendiente(MedioPendienteE(id, f.path, nombre, tipo))
         pedirSync()
-        return id
+        return medio
     }
 
     /** El archivo local de un medio aún sin subir, o null para pedirlo al servicio. */

@@ -185,9 +185,9 @@ fun HojaVariantes(
     }
 }
 
-/** Lo que se puede añadir desde la barra. El audio se queda fuera: hace falta elegir un archivo de audio. */
+/** Lo que se puede añadir desde la barra. El audio y el vídeo abren su propio paso. */
 @Composable
-fun HojaTipoBloque(onElegir: (tipo: String, contenido: String) -> Unit, onVideo: () -> Unit, onCerrar: () -> Unit) {
+fun HojaTipoBloque(onElegir: (tipo: String, contenido: String) -> Unit, onVideo: () -> Unit, onAudio: () -> Unit, onCerrar: () -> Unit) {
     val c = Tinta.colores
     HojaInferior(onCerrar) {
         Text("Añadir un bloque", style = Estilos.ui.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold), color = c.texto)
@@ -197,6 +197,7 @@ fun HojaTipoBloque(onElegir: (tipo: String, contenido: String) -> Unit, onVideo:
         FilaTipo("Lista") { onElegir("lista", "- ") }
         FilaTipo("Cita") { onElegir("cita", "> ") }
         FilaTipo("Código") { onElegir("codigo", "```\n\n```") }
+        FilaTipo("Audio", onAudio)
         FilaTipo("Vídeo de YouTube", onVideo)
     }
 }

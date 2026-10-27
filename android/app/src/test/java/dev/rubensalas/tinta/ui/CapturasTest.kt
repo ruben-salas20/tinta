@@ -117,7 +117,7 @@ class CapturasTest(private val oscuro: Boolean) {
     @Test fun tiposBloque() = capturar("4c-tipos-bloque") {
         Box(Modifier.fillMaxSize()) {
             PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {}, focoInicial = "b2")
-            HojaTipoBloque({ _, _ -> }, {}, {})
+            HojaTipoBloque({ _, _ -> }, {}, {}, {})
         }
     }
 

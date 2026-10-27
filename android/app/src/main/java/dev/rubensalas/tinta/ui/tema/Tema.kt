@@ -92,6 +92,7 @@ object Estilos {
     val uiPeque = TextStyle(fontFamily = Inter, fontSize = 12.5.sp, lineHeight = 17.sp)
     val grupo = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 0.08.em)
     val pantalla = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, letterSpacing = (-0.02).em)
+    val dialogo = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp, letterSpacing = (-0.01).em)
 }
 
 private val LocalColores = staticCompositionLocalOf { Claro }
@@ -123,6 +124,8 @@ fun TemaTinta(oscuro: Boolean = isSystemInDarkTheme(), contenido: @Composable ()
     }
     val base = Typography()
     val tipos = Typography(
+        // El título de los AlertDialog.
+        headlineSmall = Estilos.dialogo,
         bodyLarge = base.bodyLarge.copy(fontFamily = Inter),
         bodyMedium = base.bodyMedium.copy(fontFamily = Inter),
         bodySmall = base.bodySmall.copy(fontFamily = Inter),

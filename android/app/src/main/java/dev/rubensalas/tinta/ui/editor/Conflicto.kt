@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.rubensalas.tinta.data.BloqueVista
+import dev.rubensalas.tinta.data.dispositivo
 import dev.rubensalas.tinta.data.texto.Critic
 import dev.rubensalas.tinta.ui.comun.Banda
 import dev.rubensalas.tinta.ui.comun.estiloAnadido
@@ -68,7 +69,7 @@ fun PantallaConflicto(
                     style = Estilos.uiPeque, color = c.secundario,
                 )
             }
-            Redaccion("Llegó después", llego.cambiado.take(16).replace('T', ' '), dLlego, true)
+            Redaccion("Llegó después", listOfNotNull(dispositivo(llego.dispositivo), llego.cambiado.take(16).replace('T', ' ')).joinToString(" · "), dLlego, true)
             Redaccion("La que ya estaba", estaba.cambiado.take(16).replace('T', ' '), dEstaba, false)
             Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BotonPildora("Quedarme con la que llegó después", Modifier.fillMaxWidth(), principal = true, onClick = onQuedarseConLaQueLlego)

@@ -173,6 +173,9 @@ CREATE TABLE publicaciones (
   rev INTEGER NOT NULL, borrado INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX publicaciones_fecha ON publicaciones(fecha) WHERE borrado = 0;
+"#, r#"
+-- dispositivo: quién guardó una variante «conflicto» (web, android o mcp). Nulo en las demás.
+ALTER TABLE variantes_bloque ADD COLUMN dispositivo TEXT;
 "#];
 
 pub fn abrir(ruta: &Path) -> rusqlite::Result<Connection> {

@@ -31,6 +31,7 @@ Artículo → Idioma (es | en) → Rama → Sección → Variante de sección �
 - Los **medios** se citan como `medio:<id>`: `![alt](medio:ID)` para una imagen y `<audio src="medio:ID" title="…" controls></audio>` para un audio.
 - El **orden** usa posiciones fraccionarias (`posicion`, un texto que se ordena como tal). Para insertar o mover se mandan los vecinos: `{"antes": id | null, "despues": id | null}`. Si solo hay uno, el elemento queda pegado a él. Sin ninguno, va al final.
 - `origen` de una variante: `tu`, `ia:<nombre>` o `conflicto`. Editarla la convierte en `tu`.
+- `dispositivo` de una variante de bloque: `web`, `android` o `mcp`, quién la guardó. Solo lo tienen las variantes `conflicto`; en las demás es `null`, y también en las anteriores a este campo. Sale en `Documento` y en `GET /api/sync` (`variantes_bloque`).
 
 ## Rutas
 
@@ -94,7 +95,7 @@ Tipos de bloque: `parrafo`, `subtitulo`, `lista`, `cita`, `codigo`, `imagen`, `a
 
 **`rev_base` evita pisar cambios.** Es el `rev` de la variante que tenía el cliente al empezar a editar:
 - Si coincide, el texto se guarda y vuelve el `rev` nuevo, que el cliente usa en el siguiente guardado.
-- Si no coincide y el texto es distinto, otro dispositivo cambió el bloque entretanto. **No se pisa nada:** el texto llega como variante nueva con `origen: "conflicto"`, y la respuesta trae `conflicto: true`.
+- Si no coincide y el texto es distinto, otro dispositivo cambió el bloque entretanto. **No se pisa nada:** el texto llega como variante nueva con `origen: "conflicto"` y `dispositivo` con quién la guardó, y la respuesta trae `conflicto: true`.
 
 **El historial agrupa.** Los guardados seguidos del mismo dispositivo durante 10 minutos cuentan como una sola sesión de edición: solo el primero deja entrada. Restaurar siempre deja entrada, así que también se puede deshacer.
 

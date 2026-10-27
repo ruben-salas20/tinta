@@ -124,6 +124,7 @@ data class VarianteBloqueE(
     val cambiado: String,
     val rev: Long,
     val borrado: Int = 0,
+    val dispositivo: String? = null,
 )
 
 @Serializable

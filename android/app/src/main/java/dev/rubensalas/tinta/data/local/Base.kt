@@ -10,6 +10,8 @@ import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.TypeConverters
 import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -82,7 +84,7 @@ interface DaoTinta {
         VarianteSeccionE::class, BloqueE::class, VarianteBloqueE::class, MedioE::class, CanalE::class,
         PublicacionE::class, OperacionE::class, MedioPendienteE::class, AvisoE::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Conversores::class)
@@ -90,8 +92,15 @@ abstract class BaseLocal : RoomDatabase() {
     abstract fun dao(): DaoTinta
 
     companion object {
+        /** La versión 2 guarda de qué dispositivo viene una variante de conflicto. */
+        val MIGRACION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE variantes_bloque ADD COLUMN dispositivo TEXT")
+            }
+        }
+
         fun crear(context: Context): BaseLocal =
-            Room.databaseBuilder(context, BaseLocal::class.java, "tinta.db").build()
+            Room.databaseBuilder(context, BaseLocal::class.java, "tinta.db").addMigrations(MIGRACION_1_2).build()
 
         fun enMemoria(context: Context): BaseLocal =
             Room.inMemoryDatabaseBuilder(context, BaseLocal::class.java).allowMainThreadQueries().build()

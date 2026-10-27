@@ -1,5 +1,6 @@
 package dev.rubensalas.tinta.data
 
+import dev.rubensalas.tinta.data.calendario.esImagen
 import dev.rubensalas.tinta.data.calendario.horaEntera
 import dev.rubensalas.tinta.data.calendario.partir
 import dev.rubensalas.tinta.data.calendario.rangoHoras
@@ -7,6 +8,7 @@ import dev.rubensalas.tinta.data.local.PublicacionE
 import dev.rubensalas.tinta.data.resumen.Avisos
 import dev.rubensalas.tinta.data.resumen.Resumen
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -22,6 +24,12 @@ class CalendarioTest {
         val largo = "palabra ".repeat(50).trim()
         val (x, y) = partir(largo, 280)
         assertTrue(x.length <= 280 && (x + " " + y) == largo)
+    }
+
+    @Test fun soloLasImagenesSeVenComoMiniatura() {
+        assertTrue(esImagen("image/png"))
+        assertFalse(esImagen("audio/mpeg"))
+        assertFalse(esImagen("video/mp4"))
     }
 
     private fun p(id: String, fecha: String, estado: String = "idea", hora: String? = null) =

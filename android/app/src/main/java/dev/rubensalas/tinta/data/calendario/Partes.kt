@@ -12,3 +12,6 @@ fun partir(texto: String, limite: Int): Pair<String, String> {
 
 /** Caracteres como los cuenta X: por puntos de código, así un emoji cuenta uno. */
 fun longitud(texto: String): Int = texto.codePointCount(0, texto.length)
+
+/** Las imágenes se ven como miniatura; el resto de medios, con un icono y su nombre. */
+fun esImagen(tipo: String): Boolean = tipo.startsWith("image/")

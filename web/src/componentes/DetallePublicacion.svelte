@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import { api, ESTADOS_PUB, NOMBRE_ESTADO_PUB, type EstadoPub, type Publicacion } from '../lib/api';
+  import { api, ESTADOS_PUB, NOMBRE_ESTADO_PUB, type EstadoPub, type Medio, type Publicacion } from '../lib/api';
   import { contar, partir } from '../lib/calendario';
   import { avisar, canal, catalogo, confirmar, difusion, fallo, ir, pedirTexto, recargarCatalogo } from '../lib/estado.svelte';
+  import { esImagen, iconoDeMedio } from '../lib/medios';
   import { copiarTexto } from '../lib/portapapeles';
   import Icono from './Icono.svelte';
 
@@ -17,9 +18,16 @@
   let guardando = $state(false);
   let pendiente: ReturnType<typeof setTimeout> | null = null;
   let enEspera = $state(false);
+  // Por id de medio. Se piden al abrir el panel, así el tipo es el que tiene el servicio ahora.
+  let medios = $state<Record<string, Medio>>({});
 
   // El panel se recrea con cada publicación ({#key} en Calendario).
-  untrack(() => api.publicacion(id)).then((x) => (p = x)).catch(fallo);
+  untrack(() => Promise.all([api.publicacion(id), api.medios()]))
+    .then(([x, lista]) => {
+      p = x;
+      medios = Object.fromEntries(lista.map((m) => [m.id, m]));
+    })
+    .catch(fallo);
 
   const c = $derived(p ? canal(p.canal_id) : undefined);
   const fmt = $derived(c?.formatos.find((f) => f.id === p?.formato));
@@ -135,7 +143,7 @@
       try {
         const m = await api.subirMedio(f);
         p!.partes[i].medios.push(m.id);
-        tipos[m.id] = m.tipo;
+        medios[m.id] = m;
       } catch (e) {
         fallo(e);
       }
@@ -144,9 +152,7 @@
     programar(true);
   }
 
-  // Para pintar la miniatura hace falta saber si es imagen; lo subido en esta
-  // sesión se sabe, lo anterior se prueba como imagen y, si falla, se muestra el icono.
-  let tipos = $state<Record<string, string>>({});
+  // Una imagen que no carga (rotas) se muestra como icono con su nombre.
   let rotas = $state<Record<string, boolean>>({});
 
   async function copiar(i: number) {
@@ -244,11 +250,13 @@
           {#if parte.medios.length}
             <div class="medios">
               {#each parte.medios as m, j (m)}
+                {@const med = medios[m]}
                 <span class="m">
-                  {#if (tipos[m] ?? 'image/').startsWith('image/') && !rotas[m]}
+                  {#if esImagen(med?.tipo) && !rotas[m]}
                     <img src="/api/medios/{m}" alt="" onerror={() => (rotas[m] = true)} />
                   {:else}
-                    <Icono n="audio" />
+                    <Icono n={iconoDeMedio(med?.tipo)} />
+                    <small title={med?.nombre}>{med?.nombre ?? 'Medio'}</small>
                   {/if}
                   <button aria-label="Quitar" onclick={() => { parte.medios.splice(j, 1); programar(true); }}><Icono n="x" s /></button>
                 </span>

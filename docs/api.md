@@ -109,6 +109,7 @@ Tipos de bloque: `parrafo`, `subtitulo`, `lista`, `cita`, `codigo`, `imagen`, `a
 | `POST /api/series` | `{nombre}` | 201 y la serie |
 | `PATCH /api/series/{id}` | `{nombre}` | La serie |
 | `DELETE /api/series/{id}` | | 204. Los artículos quedan sin serie |
+| `GET /api/medios` | | `[Medio]`: id, sha256, nombre, tipo (MIME), tamano y creado. Sin los borrados |
 | `POST /api/medios` | Multipart, campo `archivo`. Hasta 300 MB | 201 y el `Medio` |
 | `GET /api/medios/{id}` | | El archivo, con su tipo |
 

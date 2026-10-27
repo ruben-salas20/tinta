@@ -136,7 +136,7 @@ fun autor(origen: String): String = when {
 /** Nombre en pantalla de quien guardó una variante, según la cabecera X-Tinta-Dispositivo. Nulo si no se conoce. */
 fun dispositivo(id: String?): String? = when (id) {
     "android" -> "Móvil"
-    "web" -> "Navegador"
+    "web" -> "Portátil"
     "mcp" -> "Agente"
     else -> null
 }

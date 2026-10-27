@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, type Bloque, type TipoBloque } from '../lib/api';
+  import { api, nombreDispositivo, type Bloque, type TipoBloque } from '../lib/api';
   import { activaBloque, type ControlEditor } from '../lib/editor.svelte';
   import type { Ocurrencia } from '../lib/extensiones';
   import { confirmar, fallo, pedirTexto } from '../lib/estado.svelte';
@@ -14,6 +14,7 @@
   const enfocado = $derived(ctl.foco === bloque.id);
   const variante = $derived(activaBloque(bloque));
   const conflictos = $derived(bloque.variantes.filter((v) => v.origen === 'conflicto'));
+  const llegoDe = $derived([...new Set(conflictos.map((v) => nombreDispositivo(v.dispositivo)).filter((d) => d !== null))].map((d) => `el ${d.toLowerCase()}`));
   const esTexto = $derived(['parrafo', 'subtitulo', 'lista', 'cita'].includes(bloque.tipo));
   const ubic = $derived(ctl.ubicar(bloque.id));
 
@@ -191,7 +192,7 @@
   <div class="conflicto bajo">
     <Icono n="rama" />
     <div>
-      <b>Este bloque cambió en dos sitios a la vez.</b> Tinta guardó {n(conflictos.length + 1, 'redacción', 'redacciones')} como variantes. Elige cuál queda; las demás no se pierden hasta que las descartes.
+      <b>Este bloque cambió en dos sitios a la vez.</b> Tinta guardó {n(conflictos.length + 1, 'redacción', 'redacciones')} como variantes.{#if llegoDe.length} {conflictos.length === 1 ? 'La otra llegó' : 'Las otras llegaron'} desde {llegoDe.join(' y ')}.{/if} Elige cuál queda; las demás no se pierden hasta que las descartes.
       <div class="acc">
         <button class="btn" onclick={() => (ctl.foco = bloque.id)}>Ver las variantes</button>
         <button class="btn fantasma" onclick={quedarmeConActiva}>Quedarme con la activa</button>

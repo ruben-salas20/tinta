@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { api, cuando, NOMBRE_ESTADO_PUB, quien, type EntradaHistorial, type IdiomaDetalle, type Publicacion, type VarianteBloque } from '../lib/api';
+  import { api, cuando, NOMBRE_ESTADO_PUB, nombreDispositivo, quien, type EntradaHistorial, type IdiomaDetalle, type Publicacion, type VarianteBloque } from '../lib/api';
   import { fechaCorta } from '../lib/calendario';
   import { contar, notas as leerNotas, vistazo } from '../lib/critic';
   import { activaBloque, activaSeccion, type ControlEditor } from '../lib/editor.svelte';
@@ -176,7 +176,7 @@
           <div class="cab">
             <b>{letra(i)}{esActiva ? ' · activa' : ''}</b>
             {#if v.origen.startsWith('ia:')}<span class="ia">IA</span><span>{quien(v.origen)} · propuesta</span>
-            {:else if v.origen === 'conflicto'}<span class="ia">!</span><span>conflicto</span>
+            {:else if v.origen === 'conflicto'}<span class="ia">!</span><span>conflicto{#if nombreDispositivo(v.dispositivo)} · {nombreDispositivo(v.dispositivo)}{/if}</span>
             {:else}<span>Tú</span>{/if}
             <span class="d">{cuando(v.cambiado)}</span>
           </div>

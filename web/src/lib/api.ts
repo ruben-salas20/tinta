@@ -129,6 +129,8 @@ export interface VarianteBloque {
   cambiado: string;
   rev: number;
   autoria: Rango[];
+  /** De dónde llegó una variante «conflicto»: web, android o mcp. */
+  dispositivo: string | null;
 }
 export type TipoBloque = 'parrafo' | 'subtitulo' | 'lista' | 'cita' | 'codigo' | 'imagen' | 'audio' | 'youtube';
 export interface Bloque {
@@ -349,6 +351,11 @@ export function cuando(iso: string): string {
   const ayer = new Date(hoy.getTime() - 86400000);
   if (d.toDateString() === ayer.toDateString()) return `ayer ${hora}`;
   return d.toLocaleDateString('es', { day: 'numeric', month: 'short' });
+}
+
+/** El nombre del dispositivo que guardó una variante, o null si no se sabe. */
+export function nombreDispositivo(d: string | null | undefined): string | null {
+  return ({ web: 'Portátil', android: 'Móvil', mcp: 'Agente' } as Record<string, string>)[d ?? ''] ?? null;
 }
 
 export function quien(origen: string): string {

@@ -25,6 +25,8 @@ import dev.rubensalas.tinta.ui.calendario.PantallaCalendario
 import dev.rubensalas.tinta.ui.calendario.PantallaPublicacion
 import dev.rubensalas.tinta.ui.comun.BarraInferior
 import dev.rubensalas.tinta.ui.comun.Seccion
+import dev.rubensalas.tinta.ui.editor.HojaIdiomas
+import dev.rubensalas.tinta.ui.editor.HojaRamas
 import dev.rubensalas.tinta.ui.editor.HojaVariantes
 import dev.rubensalas.tinta.ui.editor.PantallaConflicto
 import dev.rubensalas.tinta.ui.editor.PantallaEditor
@@ -85,6 +87,27 @@ class CapturasTest(private val oscuro: Boolean) {
         Box(Modifier.fillMaxSize()) {
             PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
             HojaVariantes(d.documentoDeBloque("b2")!!, {}, {}, {}, {})
+        }
+    }
+
+    @Test fun ramas() = capturar("4b-ramas") {
+        Box(Modifier.fillMaxSize()) {
+            PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
+            HojaRamas(d, d.idiomaPrincipal("llama")!!, "r-llama-2", Muestras.accionesEditor, {}, {})
+        }
+    }
+
+    @Test fun idiomas() = capturar("4c-idiomas") {
+        Box(Modifier.fillMaxSize()) {
+            PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
+            HojaIdiomas(d, "llama", d.idiomaPrincipal("llama")!!, Muestras.accionesEditor, {}, {})
+        }
+    }
+
+    @Test fun idiomasSinIngles() = capturar("4d-idiomas-sin-ingles") {
+        Box(Modifier.fillMaxSize()) {
+            PantallaEditor(d, "agentes", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
+            HojaIdiomas(d, "agentes", d.idiomaPrincipal("agentes")!!, Muestras.accionesEditor, {}, {})
         }
     }
 

@@ -61,8 +61,13 @@ object Muestras {
             i("agentes", "Lo que aprendí dirigiendo agentes durante un mes", "Qué cambió en cómo pido las cosas, y qué sigo haciendo mal."),
             i("atalaya", "Atalaya: leer el mundo en mi idioma", "Un lector RSS que traduce en la torre, sin mandar nada fuera."),
             i("copias", "Copias de seguridad que de verdad se pueden restaurar", "Idea: probar la restauración cada mes, no solo la copia."),
+            IdiomaE("i-llama-en", "llama", "en", "llama-swap: one container for all my models", "How I stopped running one service per model.", traducidoIa = 1, ramaPrincipalId = "r-llama-en", rev = 1),
         ),
-        ramas = listOf(RamaE("r-llama", "i-llama", "principal", creado = "", rev = 1)),
+        ramas = listOf(
+            RamaE("r-llama", "i-llama", "principal", creado = "", rev = 1),
+            RamaE("r-llama-2", "i-llama", "otra versión", "r-llama", "2026-10-26T08:00:00Z", 1),
+            RamaE("r-llama-en", "i-llama-en", "principal", creado = "", rev = 1),
+        ),
         secciones = listOf(SeccionE("s-a", "r-llama", "V", "vs-a", 1), SeccionE("s-b", "r-llama", "k", "vs-b", 1)),
         variantesSeccion = listOf(
             VarianteSeccionE("vs-a", "s-a", "Por qué no un contenedor por modelo", creado = "1", rev = 1),

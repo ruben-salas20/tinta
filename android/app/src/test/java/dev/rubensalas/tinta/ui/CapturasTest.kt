@@ -26,7 +26,14 @@ import dev.rubensalas.tinta.ui.calendario.PantallaPublicacion
 import dev.rubensalas.tinta.ui.comun.BarraInferior
 import dev.rubensalas.tinta.ui.comun.Seccion
 import dev.rubensalas.tinta.ui.editor.HojaFicha
+import dev.rubensalas.tinta.data.local.BloqueE
+import dev.rubensalas.tinta.data.local.VarianteBloqueE
+import dev.rubensalas.tinta.ui.editor.BloqueLectura
+import dev.rubensalas.tinta.ui.editor.Comparacion
+import dev.rubensalas.tinta.ui.editor.HojaInferior
+import dev.rubensalas.tinta.ui.editor.HojaTipoBloque
 import dev.rubensalas.tinta.ui.editor.HojaVariantes
+import dev.rubensalas.tinta.ui.editor.VersionComparada
 import dev.rubensalas.tinta.ui.editor.PantallaConflicto
 import dev.rubensalas.tinta.ui.editor.PantallaEditor
 import dev.rubensalas.tinta.ui.hoy.PantallaHoy
@@ -93,6 +100,33 @@ class CapturasTest(private val oscuro: Boolean) {
         Box(Modifier.fillMaxSize()) {
             PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {})
             HojaFicha(d, d.articulo("llama")!!, Muestras.accionesEditor, onCerrar = {})
+        }
+    }
+
+    @Test fun comparar() = capturar("4b-comparar") {
+        val b = d.documentoDeBloque("b2")!!
+        HojaInferior({}) {
+            Comparacion("parrafo", VersionComparada("A · activa", b.activa!!.contenido), VersionComparada("C", b.variantes[2].contenido), onVolver = {})
+        }
+    }
+
+    @Test fun tiposBloque() = capturar("4c-tipos-bloque") {
+        Box(Modifier.fillMaxSize()) {
+            PantallaEditor(d, "llama", sinRed = false, Muestras.accionesEditor, { null }, onVolver = {}, onConflicto = {}, focoInicial = "b2")
+            HojaTipoBloque({ _, _ -> }, {}, {})
+        }
+    }
+
+    @Test fun bloquesLectura() = capturar("4d-bloques-lectura") {
+        val e = d.copy(
+            bloques = d.bloques + listOf(BloqueE("b4", "vs-b", "W", "youtube", "v4", 1), BloqueE("b5", "vs-b", "X", "codigo", "v5", 1)),
+            variantesBloque = d.variantesBloque + listOf(
+                VarianteBloqueE("v4", "b4", "https://youtu.be/jNQXAC9IVRw", "tu", "2026-10-26T09:00:00Z", "2026-10-26T09:00:00Z", 1),
+                VarianteBloqueE("v5", "b5", "```yaml\nmodels:\n  ttl: 300\n```", "tu", "2026-10-26T09:00:00Z", "2026-10-26T09:00:00Z", 1),
+            ),
+        )
+        Column(Modifier.padding(20.dp)) {
+            for (id in listOf("b4", "b5")) BloqueLectura(e.documentoDeBloque(id)!!, { null }) {}
         }
     }
 

@@ -82,6 +82,7 @@ fun BloqueLectura(b: BloqueVista, imagen: (String) -> Any?, onTocar: () -> Unit)
                 Text(textoBloque("cita", v.contenido, c), style = estiloBloque("cita", c))
             }
             "audio" -> VistaAudio(v.contenido)
+            "youtube" -> Banda { Text("▶", color = c.texto); Text(enlaceVideo(v.contenido), Modifier.weight(1f), style = Estilos.uiPeque, color = c.secundario, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             else -> Text(
                 if (v.contenido.isBlank()) textoVacio(c) else textoBloque(b.bloque.tipo, v.contenido, c),
                 style = estiloBloque(b.bloque.tipo, c),
@@ -93,6 +94,9 @@ fun BloqueLectura(b: BloqueVista, imagen: (String) -> Any?, onTocar: () -> Unit)
         if (otras > 0) Text("${b.variantes.size} variantes", Modifier.padding(top = 4.dp), style = Estilos.uiPeque, color = c.tenue)
     }
 }
+
+/** El enlace del vídeo: la URL sola, o la del enlace Markdown [texto](url) que guarda la web. */
+private fun enlaceVideo(contenido: String) = Regex("""https?://\S+?(?=\)|\s|$)""").find(contenido)?.value ?: contenido.ifBlank { "Vídeo de YouTube" }
 
 private fun textoVacio(c: Colores) = androidx.compose.ui.text.buildAnnotatedString {
     pushStyle(androidx.compose.ui.text.SpanStyle(color = c.tenue)); append("Escribe aquí…"); pop()

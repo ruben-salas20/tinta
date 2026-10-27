@@ -18,6 +18,7 @@ import dev.rubensalas.tinta.data.local.VarianteSeccionE
 import dev.rubensalas.tinta.data.derivado
 import dev.rubensalas.tinta.data.idEtiqueta
 import dev.rubensalas.tinta.data.nuevoId
+import dev.rubensalas.tinta.data.texto.desplazar
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -149,7 +150,8 @@ class Local(private val dao: DaoTinta) {
     suspend fun aplicar(o: JsonObject) {
         when (o.op) {
             "guardar" -> dao.varianteBloque(o.texto("variante_bloque_id")!!)?.let {
-                dao.variantesBloque(listOf(it.copy(contenido = o.texto("contenido")!!, cambiado = ahora())))
+                val contenido = o.texto("contenido")!!
+                dao.variantesBloque(listOf(it.copy(contenido = contenido, cambiado = ahora(), autoria = desplazar(it.autoria, it.contenido, contenido))))
             }
             "crear_articulo" -> crearArticulo(o)
             "cambiar_articulo" -> dao.articulo(o.texto("id")!!)?.let { a ->

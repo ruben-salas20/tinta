@@ -19,10 +19,16 @@ val Trozo.esMarca: Boolean get() = this !is Trozo.Texto && this !is Trozo.Resalt
 
 private val MARCAS = listOf("{--" to "--}", "{++" to "++}", "{~~" to "~~}", "{>>" to "<<}", "{==" to "==}")
 
+/** Un trozo y dónde está en el texto: [desde] incluido, [hasta] excluido, en caracteres UTF-16. */
+data class Ubicado(val trozo: Trozo, val desde: Int, val hasta: Int)
+
 object Critic {
-    fun leer(s: String): List<Trozo> {
-        val trozos = mutableListOf<Trozo>()
-        val texto = StringBuilder()
+    fun leer(s: String): List<Trozo> = ubicar(s).map { it.trozo }
+
+    /** Los trozos de [s] con su posición. El texto normal entre dos marcas es un solo trozo. */
+    fun ubicar(s: String): List<Ubicado> {
+        val trozos = mutableListOf<Ubicado>()
+        var inicioTexto = 0
         var i = 0
         fuera@ while (i < s.length) {
             for ((abre, cierra) in MARCAS) {
@@ -31,11 +37,9 @@ object Critic {
                 val fin = s.indexOf(cierra, ini)
                 if (fin < 0) continue
                 val dentro = s.substring(ini, fin)
+                val inicio = i
                 i = fin + cierra.length
-                if (texto.isNotEmpty()) {
-                    trozos += Trozo.Texto(texto.toString())
-                    texto.clear()
-                }
+                if (inicio > inicioTexto) trozos += Ubicado(Trozo.Texto(s.substring(inicioTexto, inicio)), inicioTexto, inicio)
                 var ia: String? = null
                 if (abre != "{>>" && abre != "{==") {
                     val f = firma(s, i)
@@ -44,7 +48,7 @@ object Critic {
                         i += f.second
                     }
                 }
-                trozos += when (abre) {
+                val trozo = when (abre) {
                     "{--" -> Trozo.Borrado(dentro, ia)
                     "{++" -> Trozo.Anadido(dentro, ia)
                     "{~~" -> {
@@ -58,12 +62,13 @@ object Critic {
                     }
                     else -> Trozo.Resaltado(dentro)
                 }
+                trozos += Ubicado(trozo, inicio, i)
+                inicioTexto = i
                 continue@fuera
             }
-            texto.append(s[i])
             i++
         }
-        if (texto.isNotEmpty()) trozos += Trozo.Texto(texto.toString())
+        if (inicioTexto < s.length) trozos += Ubicado(Trozo.Texto(s.substring(inicioTexto)), inicioTexto, s.length)
         return trozos
     }
 

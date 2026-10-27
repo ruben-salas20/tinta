@@ -81,19 +81,19 @@ fun BloqueLectura(b: BloqueVista, imagen: (String) -> Any?, onTocar: () -> Unit)
         when (b.bloque.tipo) {
             "imagen" -> VistaImagen(v.contenido, imagen)
             "codigo" -> Text(
-                textoBloque("codigo", v.contenido.removePrefix("```").substringAfter('\n').removeSuffix("```").trimEnd(), c),
+                textoBloque("codigo", v.contenido, c, v.autoria),
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.gris).padding(12.dp),
                 style = estiloBloque("codigo", c),
             )
             "cita" -> Row {
                 Box(Modifier.size(width = 3.dp, height = 24.dp).background(c.lineaMarcada))
                 Spacer(Modifier.size(12.dp))
-                Text(textoBloque("cita", v.contenido, c), style = estiloBloque("cita", c))
+                Text(textoBloque("cita", v.contenido, c, v.autoria), style = estiloBloque("cita", c))
             }
             "audio" -> VistaAudio(v.contenido)
             "youtube" -> Banda { Text("▶", color = c.texto); Text(enlaceVideo(v.contenido), Modifier.weight(1f), style = Estilos.uiPeque, color = c.secundario, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             else -> Text(
-                if (v.contenido.isBlank()) textoVacio(c) else textoBloque(b.bloque.tipo, v.contenido, c),
+                if (v.contenido.isBlank()) textoVacio(c) else textoBloque(b.bloque.tipo, v.contenido, c, v.autoria),
                 style = estiloBloque(b.bloque.tipo, c),
             )
         }

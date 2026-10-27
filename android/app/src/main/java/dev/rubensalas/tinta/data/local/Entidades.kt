@@ -125,6 +125,8 @@ data class VarianteBloqueE(
     val rev: Long,
     val borrado: Int = 0,
     val dispositivo: String? = null,
+    /** Partes del texto que vienen de propuestas del agente ya aceptadas. */
+    @ColumnInfo(defaultValue = "'[]'") val autoria: List<RangoAutoria> = emptyList(),
 )
 
 @Serializable
@@ -158,6 +160,10 @@ data class CanalE(
 
 @Serializable
 data class Parte(val texto: String = "", val medios: List<String> = emptyList())
+
+/** Una parte del texto que viene de una propuesta del agente. [desde] incluido, [hasta] excluido, en puntos de código del contenido crudo. */
+@Serializable
+data class RangoAutoria(val desde: Int, val hasta: Int, val agente: String)
 
 @Serializable
 @Entity(tableName = "publicaciones")
@@ -210,6 +216,7 @@ private val json = Json { ignoreUnknownKeys = true }
 private val textos = ListSerializer(String.serializer())
 private val formatos = ListSerializer(Formato.serializer())
 private val partes = ListSerializer(Parte.serializer())
+private val rangos = ListSerializer(RangoAutoria.serializer())
 
 class Conversores {
     @TypeConverter fun deTextos(v: List<String>): String = json.encodeToString(textos, v)
@@ -218,4 +225,6 @@ class Conversores {
     @TypeConverter fun aFormatos(v: String): List<Formato> = json.decodeFromString(formatos, v)
     @TypeConverter fun dePartes(v: List<Parte>): String = json.encodeToString(partes, v)
     @TypeConverter fun aPartes(v: String): List<Parte> = json.decodeFromString(partes, v)
+    @TypeConverter fun deRangos(v: List<RangoAutoria>): String = json.encodeToString(rangos, v)
+    @TypeConverter fun aRangos(v: String): List<RangoAutoria> = json.decodeFromString(rangos, v)
 }
